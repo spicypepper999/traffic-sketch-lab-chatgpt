@@ -1,0 +1,69 @@
+name: Publish portable Windows release
+
+# The initial push publishes v0.6.0. Future releases can be launched
+# from Actions > Publish portable Windows release > Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release version tag (for example v0.6.1)"
+        type: string
+        required: true
+        default: "v0.6.0"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-portable.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  portable-release:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-portable]')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Install and build
+        shell: pwsh
+        run: |
+          npm install --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run sync:launcher
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build native portable Windows launcher
+        working-directory: launcher
+        shell: pwsh
+        run: |
+          go build -o TrafficSketchLab.exe .
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package standalone build
+        shell: pwsh
+        run: |
+          Compress-Archive -Path launcher/TrafficSketchLab.exe,launcher/README-Windows.txt -DestinationPath TrafficSketchLab-Windows.zip
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          $tag = if ($env:REQUESTED_TAG) { $env:REQUESTED_TAG } else { "v0.6.0" }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "Expected a version tag like v0.6.0" }
+          gh release view "$tag" --repo "$env:GITHUB_REPOSITORY" > $null 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "$tag" TrafficSketchLab-Windows.zip --clobber --repo "$env:GITHUB_REPOSITORY"
+          } else {
+            gh release create "$tag" TrafficSketchLab-Windows.zip --target "$env:GITHUB_SHA" --title "Traffic Sketch Lab $tag" --notes "Portable Windows x64 build. Extract the ZIP and double-click TrafficSketchLab.exe. No separate Node.js installation is needed. The game opens in your default web browser." --repo "$env:GITHUB_REPOSITORY"
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
