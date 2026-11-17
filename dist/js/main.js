@@ -395,12 +395,13 @@ function setJunctionPriority(roadId) {
     if (!n || !n.roadIds.includes(roadId))
         return toast('Click a road directly connected to this intersection', true);
     priorityPick = false;
-    if (n.control.type === 'priority' && n.control.priorityRoad === roadId)
+    const targetType = n.control.type === 'signal' ? 'signal' : 'priority';
+    if (n.control.type === targetType && n.control.priorityRoad === roadId)
         return updateInspector();
     mark();
-    intersectionControls[n.id] = { ...n.control, type: 'priority', priorityRoad: roadId };
+    intersectionControls[n.id] = { ...n.control, type: targetType, priorityRoad: roadId };
     commit();
-    toast(`${roadId} now has priority (including opposite aligned approaches)`);
+    toast(targetType === 'signal' ? `${roadId} is first green (including opposite aligned approaches)` : `${roadId} now has priority (including opposite aligned approaches)`);
 }
 function selectVehicle(id) {
     if (!Number.isInteger(id))
