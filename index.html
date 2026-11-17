@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#e8e7df" />
+  <title>Traffic Sketch Lab</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<canvas id="world"></canvas>
+<div class="app-shell">
+  <div id="junctionMenu" class="junction-popup" hidden aria-label="Intersection controls"></div>
+  <header class="topbar">
+    <div class="identity"><div class="logo" aria-hidden="true"><span></span><span></span></div><div><strong>TRAFFIC <em>SKETCH</em></strong><small>ROAD ENGINEERING SANDBOX <span class="version">ALPHA 0.6</span></small></div></div>
+    <div class="header-actions"><span id="networkBadge" class="network-badge">NETWORK READY</span><button class="quiet small" id="helpBtn">? &nbsp; Help</button><button class="quiet small" id="saveBtn">Save</button><button class="quiet small" id="loadBtn">Load</button><input id="fileInput" type="file" accept=".json,application/json" hidden/></div>
+  </header>
+  <aside class="toolbar">
+    <div class="tool-heading">BUILD TOOLS</div>
+    <button class="tool active" data-tool="select"><span class="tool-glyph">↖</span><span>Select<small>V</small></span></button>
+    <button class="tool" data-tool="street"><span class="tool-glyph">═</span><span>Street<small>1 + 1 lanes</small></span></button>
+    <button class="tool" data-tool="avenue"><span class="tool-glyph">≡</span><span>Avenue<small>2 + 2 lanes</small></span></button>
+    <button class="tool" data-tool="oneway"><span class="tool-glyph">➜</span><span>One-way<small>2 lanes</small></span></button>
+    <button class="tool" data-tool="highway"><span class="tool-glyph">☰</span><span>Highway<small>3 + 3 lanes</small></span></button>
+    <div class="tool-separator"></div>
+    <button class="tool" data-tool="endpoints"><span class="tool-glyph">◎</span><span>Trip nodes<small>Origin / target</small></span></button>
+    <button class="tool" data-tool="junctions"><span class="tool-glyph">✣</span><span>Intersections<small>All lane paths</small></span></button>
+    <button class="tool" data-tool="lanes"><span class="tool-glyph">⑂</span><span>Lane links<small>All connections</small></span></button>
+    <button class="tool" data-tool="pan"><span class="tool-glyph">✥</span><span>Pan view<small>Space + drag</small></span></button>
+    <div class="tool-separator"></div>
+    <div class="tool-heading">ROAD OPTIONS</div>
+    <label class="toggle-row"><input type="checkbox" id="gridToggle" checked/><span>Show grid</span><kbd>G</kbd></label>
+    <label class="toggle-row"><input type="checkbox" id="gridSnapToggle"/><span>Snap to grid</span></label>
+    <label class="toggle-row"><input type="checkbox" id="snapToggle" checked/><span>Snap to roads</span></label>
+    <label class="toggle-row"><input type="checkbox" id="curveToggle"/><span>Curved road</span><kbd>C</kbd></label>
+    <div class="alt-label">START ELEVATION</div>
+    <select id="fromElevation"><option value="0">Ground · 0 m</option><option value="6">Bridge · +6 m</option><option value="-6">Tunnel · −6 m</option></select>
+    <div class="alt-label">END ELEVATION</div>
+    <select id="toElevation"><option value="0">Ground · 0 m</option><option value="6">Bridge · +6 m</option><option value="-6">Tunnel · −6 m</option></select>
+    <div class="spacer"></div>
+    <div class="tiny-tip">Left click to build / select<br/>Mouse wheel to zoom<br/>Right click or Esc to cancel</div>
+  </aside>
+  <aside class="inspector">
+    <div class="panel-label">TRAFFIC ENGINEERING</div>
+    <div class="panel-title" id="inspectorTitle">Network overview</div>
+    <div id="inspectorBody"></div>
+    <div class="panel-divider"></div>
+    <div class="panel-label">SIMULATION TELEMETRY</div>
+    <div class="metrics">
+      <div class="metric"><small>ACTIVE VEHICLES</small><strong id="activeStat">0</strong></div>
+      <div class="metric"><small>AVERAGE SPEED</small><strong id="speedStat">0 <span>km/h</span></strong></div>
+      <div class="metric"><small>COMPLETED TRIPS</small><strong id="tripsStat">0</strong></div>
+      <div class="metric"><small>STOPPED VEHICLES</small><strong id="stoppedStat">0</strong></div>
+    </div>
+    <div class="mini-stats"><div>Average travel time <strong id="timeStat">—</strong></div><div>Worker update <strong id="updateStat">—</strong></div><div>Rendering FPS <strong id="fpsStat">—</strong></div><div>Waiting at source <strong id="pendingStat">0</strong></div><div>Junctions crossed <strong id="crossStat">0</strong></div><div>Average vehicle delay <strong id="delayStat">0 s</strong></div><div>Network nodes <strong id="nodeStat">—</strong></div><div>Generated lanes <strong id="laneStat">—</strong></div></div>
+    <div class="panel-divider"></div>
+    <div class="pair-head"><div class="panel-label">TRAFFIC SOURCE / TARGET PAIRS</div><button id="addPair" class="small-add" title="Add traffic pair">+ Add pair</button></div>
+    <div id="pairList" class="pair-list"></div>
+    <label class="pair-name-label">Selected pair name<input id="pairName" type="text" maxlength="32" autocomplete="off" value="Pair 1" /></label>
+    <div class="panel-label">ROUTING · <span id="activePairLabel">Pair 1</span></div>
+    <div class="od-panel">
+      <button id="pickSource" class="od-picker" title="Pick vehicle source on map"><b class="od-dot source">S</b><span>ORIGIN<strong id="sourceValue">Not selected</strong></span></button>
+      <button id="pickTarget" class="od-picker" title="Pick vehicle destination on map"><b class="od-dot target">T</b><span>DESTINATION<strong id="targetValue">Not selected</strong></span></button>
+      <div id="tripStatus" class="trip-status">Select source and target nodes</div>
+    </div>
+    <div class="panel-divider"></div>
+    <div class="panel-label">DRIVER BEHAVIOR</div>
+    <label class="range-title"><span>Following time</span><b id="headwayVal">1.5 s</b></label><input id="headway" type="range" min="0.6" max="3" step="0.1" value="1.5" />
+    <label class="range-title"><span>Minimum gap</span><b id="gapVal">2.5 m</b></label><input id="minGap" type="range" min="1" max="8" step="0.5" value="2.5" />
+    <label class="range-title"><span>Start-up delay</span><b id="delayVal">0.7 s</b></label><input id="startDelay" type="range" min="0" max="2" step="0.1" value="0.7" />
+    <label class="toggle-row debug"><input id="debugToggle" type="checkbox"/>Show lane debug overlay</label><div class="alt-label">GRAPHICS / LOW-END HARDWARE</div><label class="quality-control">Rendering<select id="qualitySelect"><option value="fast">Fast · 1× resolution</option><option value="balanced">Sharper · up to 1.5×</option></select></label>
+  </aside>
+  <div class="bottom-status"><span id="actionHint">Select a road to inspect and edit it.</span><span class="status-meta" id="coordinateStat">0 m · 0 m</span></div>
+  <div class="simbar"><button id="runPause" class="sim-btn play">Ⅱ</button><div class="simclock"><small>SIMULATION TIME</small><strong id="simClock">00:00</strong></div><div class="sim-separator"></div><div class="speed-buttons"><button data-speed="1" class="active">1×</button><button data-speed="2">2×</button><button data-speed="4">4×</button></div><div class="sim-separator"></div><label class="demand"><span>TRAFFIC DEMAND <b id="rateVal">0.8/s</b></span><input id="spawnRate" type="range" min="0" max="8" step="0.2" value="0.8"/></label><button id="spawnBtn" class="sim-btn outlined">Queue 25 cars</button></div>
+  <div class="world-info">GRID: 20 M <span class="world-sep">·</span> <span id="zoomText">145%</span> <span class="world-sep">·</span> METRIC</div>
+  <div class="notifications" id="notifications" aria-live="polite"></div>
+  <div class="help-backdrop hidden" id="helpBackdrop"><div class="help-dialog"><button id="helpClose" class="help-close">×</button><div class="panel-label">TRAFFIC SKETCH LAB / ALPHA 0.6</div><h2>Build the network. Watch it move.</h2><p>This is an interactive traffic engineering prototype. Every road is compiled into individual directional lanes and intersections before vehicles are simulated.</p><div class="help-columns"><div><h3>Build</h3><p>Choose a road tool. Click once to start and again to finish. Enable <b>Curved road</b> to place a third point that bends the curve. New at-grade crossings compile into junctions automatically.</p><p>Set start/end elevations to build ramps. Roads crossing at different heights do not connect.</p></div><div><h3>Inspect & control</h3><p>Use <b>Select</b> to click a car and inspect its planned route, or drag road endpoints or curve handles. Use <b>Lane links</b> to select each inbound lane and toggle any outbound movement, including 1→2 splits and 2→1 merges. Use <b>Trip nodes</b> to assign sources and targets for several independent traffic pairs. Drag individual lane endpoint handles when an intersection is selected.</p><p>Spawn vehicles between your selected nodes, change the demand slider, and adjust car-following settings. Simulation runs in a separate Web Worker.</p></div></div><div class="help-shortcuts">V select &nbsp; · &nbsp; P priority picker &nbsp; · &nbsp; G grid &nbsp; · &nbsp; C curve &nbsp; · &nbsp; Space + drag pan &nbsp; · &nbsp; Del delete &nbsp; · &nbsp; Ctrl+Z undo &nbsp; · &nbsp; Esc cancel</div><button class="primary" id="helpOk">Start designing</button></div></div>
+</div>
+<script type="module" src="./dist/js/main.js"></script>
+</body>
+</html>

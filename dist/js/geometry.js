@@ -1,0 +1,37 @@
+// @ts-nocheck
+export const clamp = (x, a, b) => Math.max(a, Math.min(x, b));
+export const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+export const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+export const mul = (a, k) => ({ x: a.x * k, y: a.y * k });
+export const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+export const len = p => Math.hypot(p.x, p.y);
+export const unit = p => { const l = len(p) || 1; return mul(p, 1 / l); };
+export const dot = (a, b) => a.x * b.x + a.y * b.y;
+export const cross = (a, b) => a.x * b.y - a.y * b.x;
+export const normal = p => { const u = unit(p); return { x: -u.y, y: u.x }; };
+export const mix = (a, b, t) => add(mul(a, 1 - t), mul(b, t));
+export const cubic = (r, t) => { const k = 1 - t; return add(add(mul(r.p0, k * k * k), mul(r.p1, 3 * k * k * t)), add(mul(r.p2, 3 * k * t * t), mul(r.p3, t * t * t))); };
+export const tangent = (r, t) => { const k = 1 - t; return unit(add(add(mul(sub(r.p1, r.p0), 3 * k * k), mul(sub(r.p2, r.p1), 6 * k * t)), mul(sub(r.p3, r.p2), 3 * t * t))); };
+export const samples = (r, n = 50) => Array.from({ length: n + 1 }, (_, i) => ({ t: i / n, p: cubic(r, i / n) }));
+export const offset = (r, t, d) => add(cubic(r, t), mul(normal(tangent(r, t)), d));
+export const controlStraight = (a, b) => [mix(a, b, 1 / 3), mix(a, b, 2 / 3)];
+export const controlBend = (a, b, mid) => { const q = sub(mul(mid, 2), mul(add(a, b), .5)); return [add(a, mul(sub(q, a), 2 / 3)), add(b, mul(sub(q, b), 2 / 3))]; };
+export const metrics = pts => { const cumulative = [0]; for (let i = 1; i < pts.length; i++)
+    cumulative.push(cumulative[i - 1] + dist(pts[i - 1], pts[i])); return { cumulative, length: cumulative.at(-1) || 0 }; };
+export const at = (p, s) => { const a = p.cumulative, pts = p.points; s = clamp(s, 0, p.length); let lo = 0, hi = a.length - 1; while (lo < hi - 1) {
+    let j = (lo + hi) >> 1;
+    if (a[j] < s)
+        lo = j;
+    else
+        hi = j;
+} let j = Math.max(1, hi), d = a[j] - a[j - 1], t = d ? (s - a[j - 1]) / d : 0; let u = sub(pts[j], pts[j - 1]); return { point: mix(pts[j - 1], pts[j], t), angle: Math.atan2(u.y, u.x) }; };
+export const nearestSeg = (p, a, b) => { const v = sub(b, a), t = clamp(dot(sub(p, a), v) / (dot(v, v) || 1), 0, 1); const q = add(a, mul(v, t)); return { t, p: q, d: dist(p, q) }; };
+export const nearestLine = (p, pts) => { let best = { d: Infinity, s: 0, p: pts[0] }, s = 0; for (let i = 1; i < pts.length; i++) {
+    const q = nearestSeg(p, pts[i - 1], pts[i]), l = dist(pts[i - 1], pts[i]);
+    if (q.d < best.d)
+        best = { d: q.d, s: s + l * q.t, p: q.p };
+    s += l;
+} return best; };
+export const intersect = (a, b, c, d) => { const v = sub(b, a), w = sub(d, c), den = cross(v, w); if (Math.abs(den) < 1e-9)
+    return null; const x = sub(c, a), ta = cross(x, w) / den, tb = cross(x, v) / den; if (ta < -.0001 || ta > 1.0001 || tb < -.0001 || tb > 1.0001)
+    return null; return { ta: clamp(ta, 0, 1), tb: clamp(tb, 0, 1), p: add(a, mul(v, ta)) }; };

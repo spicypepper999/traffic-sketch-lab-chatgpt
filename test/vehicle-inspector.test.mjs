@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {compileNetwork} from '../dist/js/network.js';
+import {controlStraight} from '../dist/js/geometry.js';
+const p=(x,y)=>({x,y});
+const [p1,p2]=controlStraight(p(-90,0),p(90,0));
+const road={id:'r1',kind:'street',p0:p(-90,0),p1,p2,p3:p(90,0),z0:0,z1:0,forward:1,backward:1,width:3.5,speed:50};
+
+test('selected vehicle exposes live route and progress without broadcasting every car route',async()=>{
+ const network=compileNetwork([road]);let tick,snapshot;
+ globalThis.self={postMessage(m){if(m.type==='SNAPSHOT')snapshot=m;}};
+ globalThis.setInterval=fn=>tick=fn;
+ await import('../dist/js/sim-worker.js?route-inspection-06');
+ self.onmessage({data:{type:'INIT',network}});
+ self.onmessage({data:{type:'SET_PAIRS',pairs:[{id:'commuters',sourceId:'j:-900:0:0',targetId:'j:900:0:0',rate:0,enabled:true,colorIndex:2}]}});
+ self.onmessage({data:{type:'SPAWN',pairId:'commuters',count:1}});
+ for(let i=0;i<3;i++)tick();
+ assert.equal(snapshot.vehicles.length,1);
+ assert.equal(snapshot.vehicles[0].route,undefined,'avoid sending a full route per vehicle');
+ const car=snapshot.vehicles[0];
+ self.onmessage({data:{type:'SELECT_VEHICLE',id:car.id}});
+ const detailed=snapshot.selectedVehicle;
+ assert.equal(detailed.id,car.id);
+ assert.equal(detailed.pairId,'commuters');
+ assert.deepEqual(detailed.route,[car.pathId]);
+ assert.ok(detailed.s>=0);assert.equal(detailed.index,0);
+ for(let i=0;i<10;i++)tick();
+ assert.ok(snapshot.selectedVehicle.s>detailed.s,'position updates after selection');
+ self.onmessage({data:{type:'SELECT_VEHICLE',id:null}});
+ assert.equal(snapshot.selectedVehicle,null);
+});
