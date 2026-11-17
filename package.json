@@ -1,5 +1,19 @@
 {
-  "name":"traffic-sketch-lab", "version":"0.6.0", "private":true, "type":"module",
-  "scripts":{"start":"node serve.mjs","dev":"node serve.mjs","build":"tsc -p tsconfig.json","sync:launcher":"node scripts/sync-launcher.mjs","test":"node --test test/*.test.mjs"},
-  "devDependencies":{"typescript":"^5.9.3"}
+  "name": "traffic-sketch-lab",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node serve.mjs",
+    "dev": "node serve.mjs",
+    "build": "tsc -p tsconfig.json",
+    "sync:launcher": "node scripts/sync-launcher.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "playwright test --project=firefox",
+    "test:browser:headed": "playwright test --project=firefox --headed"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@playwright/test": "^1.65.0"
+  }
 }

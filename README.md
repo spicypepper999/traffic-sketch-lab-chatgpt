@@ -104,3 +104,31 @@ No external account credentials are embedded in this repository.
 - Vehicle metadata is carried only for the selected car, reducing unnecessary cross-thread traffic.
 
 **Important:** Any structural/network-control edit still resets active traffic. A future live-editing update will preserve or safely reroute vehicles across graph changes.
+
+## Real Firefox UI tests (Windows 11 and GitHub Actions)
+
+The unit tests (`npm test`) exercise the road network and traffic logic, but they
+cannot detect all mouse, drawing, browser worker or DOM problems. The Playwright
+end-to-end tests in `e2e/` open the actual game in Firefox, capture screenshots,
+and exercise map zoom, controls and intersection editing.
+
+On Windows 11, install Node.js 22 or later, then from a terminal in this folder:
+
+```powershell
+npm install
+npm run build
+npx playwright install firefox
+npm run test:browser:headed
+```
+
+For background testing, use `npm run test:browser`. If a test fails, inspect
+`playwright-report/` and `test-results/`, or run `npx playwright show-report`.
+Playwright downloads a testing copy of Firefox; it does **not** control the
+Firefox installation you normally use. For a bug specific to your own Firefox,
+open the game normally, press Ctrl+Shift+J for Firefox's browser console and
+capture the errors and steps to reproduce it.
+
+The GitHub Actions **Firefox UI tests** job runs the same tests on a Windows
+runner after each push. It saves an HTML report and screenshots/traces as a
+`Firefox-UI-Report-Windows` workflow artifact. This does not benchmark FPS on
+your computer or guarantee that a real GPU driver behaves identically.
