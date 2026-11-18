@@ -168,7 +168,10 @@ function step(){
   if(lead){distance=Math.min(distance,Math.max(0,lead.gap-.25));if(distance<.01&&lead.gap<gapMin)v.v=0;}
   if(requiresStop&&!admitted&&distance>=line-v.s){distance=Math.max(0,line-v.s);v.v=0;}
   v.waiting=requiresStop&&!admitted&&line-v.s<Math.max(7,v.v*2+3);
-  v.braking=acc<-.45||v.waiting&&v.v<1.2;
+  // A queued car keeps its brake lamps on even after deceleration is zero.
+  // Do not tie lamps solely to negative acceleration: stationary followers
+  // would otherwise appear to have released their brakes.
+  v.braking=acc<-.45||v.waiting||v.v<.65||(lead&&lead.gap<gapMin+3&&v.v<1.8);
   if(v.v<.4)v.delayTime+=DT;
   let done=false;
   for(let j=0;j<5;j++){

@@ -52,3 +52,21 @@ test('Firefox intersection selection opens on-map traffic controls', async ({pag
   await testInfo.attach('Priority intersection', {body:await page.screenshot(),contentType:'image/png'});
   expect(errors).toEqual([]);
 });
+
+
+test('Select tool picks road pavement and junctions at normal zoom',async ({page},testInfo)=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('/');await expect(page.locator('#networkBadge')).toContainText('LANES');
+ const rect=await page.locator('#world').boundingBox();
+ const loc=(x,y)=>({x:rect.x+rect.width/2+x*1.25,y:rect.y+rect.height/2+y*1.25});
+ await page.locator('[data-tool="select"]').click();
+ const road=loc(-180,5);
+ await page.mouse.click(road.x,road.y);
+ await expect(page.locator('#inspectorTitle')).toContainText('Road properties');
+ const junction=loc(-80,0);
+ await page.mouse.click(junction.x,junction.y);
+ await expect(page.locator('#inspectorTitle')).toContainText('Intersection');
+ await expect(page.locator('#junctionMenu')).toBeVisible();
+ await testInfo.attach('Select road and intersection', {body:await page.screenshot(),contentType:'image/png'});
+ expect(errors).toEqual([]);
+});

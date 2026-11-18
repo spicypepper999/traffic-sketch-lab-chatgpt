@@ -2,6 +2,7 @@
 import {add,sub,mul,mix,clamp,dist,samples,offset,cubic,at,unit} from './geometry.js';
 import {movementColor,pairColor} from './colors.js';
 import {signalAspect} from './signals.js';
+import {laneRibbon} from './road-surface.js';
 const colors=['#edc775','#e5a191','#b9d8bd','#faf5e2','#aec5e2','#d4afd9'];
 const rgba={allowed:'#3cdd97',blocked:'#ee8479',selected:'#ffe08a',incoming:'#ffca74',outgoing:'#76e8d3'};
 function path2d(points,close=false){if(typeof Path2D==='undefined')return null;const p=new Path2D();if(points.length){p.moveTo(points[0].x,points[0].y);for(let i=1;i<points.length;i++)p.lineTo(points[i].x,points[i].y);if(close)p.closePath();}return p}
@@ -35,16 +36,17 @@ export class Renderer {
  refreshScene(o){
   if(this.roads!==o.roads||this.network!==o.network){
    this.roads=o.roads;this.network=o.network;this.roadCache.clear();this.pathCache.clear();this.pathMap=new Map([...o.network.lanes,...o.network.connectors].map(p=>[p.id,p]));
+   // Generate the paved strips from the same *clipped* lane geometry that
+   // cars use. Raw Bézier centerlines must never paint through a junction.
    for(const r of o.roads){
-    const n=clamp(Math.ceil(dist(r.p0,r.p3)/5),24,120),positive=[],negative=[],dividers=[];
-    for(let i=0;i<=n;i++)positive.push(offset(r,i/n,r.forward*r.width));
-    for(let i=0;i<=n;i++)negative.push(offset(r,1-i/n,-r.backward*r.width));
-    const perimeter=[...positive,...negative];
-    for(let k=-r.backward+1;k<r.forward;k++){
-     const pts=Array.from({length:n+1},(_,i)=>offset(r,i/n,k*r.width));
-     dividers.push({pts,path:path2d(pts),center:k===0&&r.forward&&r.backward});
-    }
-    this.roadCache.set(r.id,{path:path2d(perimeter,true),pts:perimeter,bb:bounds(perimeter),dividers});
+    const lanes=o.network.lanes.filter(l=>l.roadId===r.id);
+    const pieces=lanes.map(l=>{
+     const geom=laneRibbon(l,r.width);
+     return {lane:l,polygon:geom.polygon,shape:path2d(geom.polygon,true),
+      left:geom.left,right:geom.right,bb:bounds(geom.polygon)};
+    });
+    const vertices=pieces.flatMap(item=>item.polygon);
+    this.roadCache.set(r.id,{pieces,bb:vertices.length?bounds(vertices):null});
    }
    for(const p of this.pathMap.values())this.pathCache.set(p.id,path2d(p.points));
    for(const n of o.network.intersections||[])n._shape=path2d(n.polygon,true);
@@ -58,15 +60,30 @@ export class Renderer {
    c.beginPath();for(let x=Math.floor(a.x/space)*space;x<=b.x;x+=space){c.moveTo(x,a.y);c.lineTo(x,b.y)}for(let y=Math.floor(a.y/space)*space;y<=b.y;y+=space){c.moveTo(a.x,y);c.lineTo(b.x,y)}c.strokeStyle=color;c.lineWidth=width/this.zoom;c.stroke();
   }
  }
- road(r,shadow=false){const obj=this.roadCache.get(r.id);if(!obj||!this.visible(obj.bb))return;const c=this.ctx;
-  if(shadow){c.save();c.translate(3,3.5);this.fillPath(obj.path,obj.pts,'#8c96905e');c.restore();return;}
-  const underground=(r.z0+r.z1)<0;
-  this.fillPath(obj.path,obj.pts,underground?'#707b7899':'#586368');
-  c.strokeStyle='#e6e7dc';c.lineWidth=.6;c.setLineDash(underground?[3,3]:[]);
-  if(obj.path)c.stroke(obj.path);else this.line(obj.pts,'#e6e7dc',.6);
-  c.setLineDash([]);
-  for(const d of obj.dividers){c.lineWidth=d.center?.32:.23;c.strokeStyle=d.center?'#dfcb83':'#c3cdca';c.setLineDash(d.center?[]:[3.5,5]);if(d.path)c.stroke(d.path);else this.line(d.pts,c.strokeStyle,c.lineWidth,d.center?[]:[3.5,5])}
-  c.setLineDash([]);
+ road(r,shadow=false){
+  const item=this.roadCache.get(r.id);if(!item||!item.bb||!this.visible(item.bb))return;
+  const c=this.ctx,underground=(r.z0+r.z1)<0;
+  if(shadow)c.save(),c.translate(3,3.5);
+  // Paint each directional lane as a continuous ribbon, *ending at its real
+  // portal*. All painted markings are similarly clipped and cannot overshoot.
+  for(const piece of item.pieces){
+   if(!this.visible(piece.bb))continue;
+   this.fillPath(piece.shape,piece.polygon,shadow?'#8c96905e':underground?'#707b7899':'#586368');
+  }
+  if(shadow){c.restore();return;}
+  for(const piece of item.pieces){
+   if(!this.visible(piece.bb))continue;
+   const lane=piece.lane;
+   const dash=underground?[3,3]:[];
+   if(lane.index===lane.count-1)this.line(piece.left,'#e1e5dd',.55,dash);
+   else this.line(piece.left,'#c3cdca',.28,[3.5,5]);
+   // The right edge of lane 0 is the physical median / other road edge.
+   if(lane.index===0){
+    if(lane.direction===1&&r.backward>0)this.line(piece.right,'#dfcb83',.32,dash);
+    else if((lane.direction===1&&r.backward===0)||(lane.direction===-1&&r.forward===0))
+     this.line(piece.right,'#e1e5dd',.55,dash);
+   }
+  }
  }
  arrow(path,s,color,size=3.5){if(!path?.length)return;const c=this.ctx,p=at(path,clamp(s,0,path.length));c.save();c.translate(p.point.x,p.point.y);c.rotate(p.angle);c.fillStyle=color;c.beginPath();c.moveTo(size*.65,0);c.lineTo(-size*.55,-size*.44);c.lineTo(-size*.25,0);c.lineTo(-size*.55,size*.44);c.closePath();c.fill();c.restore()}
  nodeBadge(n,label,color){const c=this.ctx,r=11/this.zoom;c.save();c.beginPath();c.arc(n.x,n.y,r,0,2*Math.PI);c.fillStyle=color;c.fill();c.lineWidth=2/this.zoom;c.strokeStyle='#f8f8ed';c.stroke();c.fillStyle='#fff';c.textAlign='center';c.textBaseline='middle';c.font=`bold ${12/this.zoom}px system-ui,sans-serif`;c.fillText(label,n.x,n.y+.4/this.zoom);c.restore()}

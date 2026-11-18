@@ -28,10 +28,14 @@ test('editor initializes sample map, selects fixed nodes, and draws with Canvas2
  assert.equal(elts.get('spawnBtn').disabled,false);
  assert.ok(Number(elts.get('nodeStat').textContent)>0);
  assert.ok(Number(elts.get('laneStat').textContent)>0);
- assert.match(elts.get('pairList').innerHTML,/Pair 1/);
+ assert.match(elts.get('pairList').innerHTML,/East-west traffic/);
+ assert.match(elts.get('pairList').innerHTML,/North-south traffic/);
+ assert.ok(messages.some(m=>m.type==='SET_PAIRS'&&m.pairs?.length===2),'sample map has two traffic flows');
  // Click a real intersection, then ensure every lane path is listed without a JS crash.
  const down=listeners.get('world:pointerdown');
  const evt=(x,y)=>({button:0,pointerId:1,clientX:750+x*1.25,clientY:500+y*1.25,shiftKey:false});
+ down(evt(-180,5));
+ assert.match(elts.get('inspectorTitle').textContent,/Road properties/,'clicking inside road surface selects road in Select mode');
  down(evt(-80,0));
  assert.match(elts.get('inspectorBody').innerHTML,/Intersection/);
  assert.match(elts.get('inspectorBody').innerHTML,/portal-row/);
@@ -41,16 +45,16 @@ test('editor initializes sample map, selects fixed nodes, and draws with Canvas2
  assert.ok(intersection,'expected sample junction');
  const inbound=map.lanes.find(l=>l.id===intersection.incoming[0]);
  const handle=inbound.points.at(-1);
- down(evt(handle.x,handle.y));
+ down({...evt(handle.x,handle.y),altKey:true});
  listeners.get('world:pointermove')({...evt(handle.x+2,handle.y+3)});
  listeners.get('world:pointerup')({});
  assert.ok(Object.keys(JSON.parse(lastSave).portals).length>0,'dragged portal persisted');
  // Add a separate OD pair and assign its source/destination through map clicks.
  elts.get('addPair').onclick();
- assert.match(elts.get('pairList').innerHTML,/Pair 2/);
+ assert.match(elts.get('pairList').innerHTML,/Pair 3/);
  down(evt(-350,0));
  down(evt(360,0));
  assert.match(elts.get('tripStatus').textContent,/Route found/);
- assert.ok(messages.some(m=>m.type==='SET_PAIRS'&&m.pairs?.length===2));
- assert.ok(lastSave&&JSON.parse(lastSave).odPairs.length===2);
+ assert.ok(messages.some(m=>m.type==='SET_PAIRS'&&m.pairs?.length===3));
+ assert.ok(lastSave&&JSON.parse(lastSave).odPairs.length===3);
 });

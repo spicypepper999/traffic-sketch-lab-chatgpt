@@ -4,6 +4,7 @@ import {compileNetwork,PRESETS,findRoute} from './network.js';
 import {clamp,cubic,dist,samples,nearestLine,controlStraight,controlBend} from './geometry.js';
 import {movementColor,pairColor} from './colors.js';
 import {roadJunctions,junctionRoads,priorityApproaches} from './inspection.js';
+import {hitRoad,hitJunction} from './hit-test.js';
 const el=id=>document.getElementById(id),canvas=el('world'),render=new Renderer(canvas),worker=new Worker(new URL('./sim-worker.js',import.meta.url),{type:'module'});
 const defaults={quality:'fast',grid:true,snap:true,curve:false,roadKind:'street',z0:0,z1:0,spawnRate:.8,headway:1.5,gap:2.5,startDelay:.7,simSpeed:1};
 let settings={...defaults},roads=[],blocked=new Set(),forced=new Set(),closed=new Set(),network=compileNetwork([]),pathLookup=new Map(),idCount=0,tool='select',selectedRoad=null,selectedLane=null;
@@ -28,6 +29,17 @@ function example(){idCount=0;return[
  makeRoad('oneway',{x:130,y:0},{x:130,y:168},{x:95,y:85},0,6),
  makeRoad('street',{x:205,y:-230},{x:350,y:-65},{x:330,y:-175}),
  makeRoad('street',{x:-350,y:-260},{x:-345,y:-144})];}
+// A second, orthogonal OD flow makes the sample intersection meaningful.
+// Source/target markers are backed by genuine nodes, never random spawners.
+const samplePairs=()=>[
+ {id:'pair1',name:'East-west traffic',sourceId:'j:-3500:0:0',targetId:'j:3600:0:0',rate:.7,enabled:true,colorIndex:0},
+ {id:'pair2',name:'North-south traffic',sourceId:'j:-800:-2550:0',targetId:'j:-800:2550:0',rate:.65,enabled:true,colorIndex:1}
+];
+function upgradeSamplePairs(){
+ if(odPairs.length!==1||odPairs[0].id!=='pair1'||odPairs[0].sourceId!=='j:-3500:0:0'||odPairs[0].targetId!=='j:3600:0:0')return;
+ const hasVertical=roads.some(r=>Math.abs(r.p0.x+80)<.01&&Math.abs(r.p0.y+255)<.01&&Math.abs(r.p3.x+80)<.01&&Math.abs(r.p3.y-255)<.01);
+ if(hasVertical){odPairs[0].name='East-west traffic';odPairs[0].rate=.7;odPairs.push(samplePairs()[1]);nextPairNumber=2;}
+}
 function asSave(){return{version:4,roads,blocked:[...blocked],forced:[...forced],closed:[...closed],odPairs,activePairId,portals,intersectionControls,settings}}
 function snapshot(){return JSON.stringify({roads,blocked:[...blocked],forced:[...forced],closed:[...closed],odPairs,activePairId,portals,intersectionControls})}
 function mark(){undoStack.push(snapshot());if(undoStack.length>80)undoStack.shift();redoStack.length=0}
@@ -110,27 +122,22 @@ function setTool(name){
  document.querySelectorAll('[data-tool]').forEach(btn=>btn.classList.toggle('active',btn.dataset.tool===name));
  canvas.style.cursor=name==='pan'?'grab':name==='select'?'default':'crosshair';
  el('pickSource').classList.toggle('picking',name==='endpoints'&&picking==='source');el('pickTarget').classList.toggle('picking',name==='endpoints'&&picking==='target');
- el('actionHint').textContent=name==='select'?'Click a road or intersection to inspect it. Drag road handles to edit.':
+ el('actionHint').textContent=name==='select'?'Click any road pavement, intersection, or vehicle to inspect it. Alt+drag a selected junction endpoint.':
   name==='lanes'||name==='junctions'?'Click an intersection. Drag its lane endpoints or edit the solid-colored turning paths.':
   name==='endpoints'?'Click a junction or road endpoint to set the '+picking+'.':
   name==='pan'?'Drag to pan. Scroll to zoom.':'Click a start point, then an end point'+(settings.curve?', then a curve bend.':'.');
  render.invalidateMap();updateInspector();
 }
-function containsPolygon(p,poly){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
- const a=poly[i],b=poly[j];if(((a.y>p.y)!==(b.y>p.y))&&(p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x))inside=!inside;
- }return inside;}
-function intersectionAt(p){const hits=network.intersections.filter(n=>
-  dist(p,n.center)<Math.max(5,14/render.zoom)||containsPolygon(p,n.polygon));
- hits.sort((a,b)=>Math.abs(a.z-settings.z0)-Math.abs(b.z-settings.z0)||dist(p,a.center)-dist(p,b.center));
- return hits[0]||null;
-}
+function intersectionAt(p){return hitJunction(network,p,render.zoom)}
 function chooseIntersection(p){const n=intersectionAt(p);selectedJunction=n?.id||null;selectedRoad=null;selectedLane=null;selectedVehicleId=null;selectedVehicleDetail=null;selectedVehicleRoute=null;priorityPick=false;send({type:'SELECT_VEHICLE',id:null});updateInspector();render.invalidateMap();return !!n;}
-function roadAt(p){let match=null,best=Infinity;for(const r of roads){const d=nearestLine(p,samples(r,Math.max(25,Math.min(100,Math.ceil(dist(r.p0,r.p3)/4)))).map(s=>s.p)).d;if(d<Math.max(4,9/render.zoom)&&d<best){best=d;match=r;}}return match}
+function roadAt(p){return hitRoad(network,roads,p,render.zoom,9)}
 function laneAt(p,junctionId=null){let best=Infinity,id=null;for(const l of network.lanes){if(junctionId&&l.endNode!==junctionId)continue;const d=nearestLine(p,l.points).d;if(d<Math.max(1.6,6/render.zoom)&&d<best){best=d;id=l.id}}return id}
 function nodeAt(p){let best=Math.max(6,13/render.zoom),selected=null;for(const n of network.nodes){const d=dist(p,n);if(d<best){best=d;selected=n}}return selected}
 function connectorAt(p){let best=Infinity,id=null;for(const c of network.candidates.filter(c=>c.from===selectedLane)){const d=nearestLine(p,c.points).d;if(d<Math.max(2,8/render.zoom)&&d<best){best=d;id=c.id}}return id}
 function snap(p,z,shift=false){
  if(shift)return p;let near=null,best=Math.max(3,12/render.zoom);
+ if(settings.snap){for(const n of network.nodes){if(!n.isJunction||Math.abs(n.z-z)>1.2)continue;const d=dist(n,p);if(d<best){near={x:n.x,y:n.y};best=d;}}
+ if(near)return near;}
  if(settings.snap)for(const r of roads){
   for(const [pt,h] of [[r.p0,r.z0],[r.p3,r.z1]]){const d=dist(pt,p);if(d<best&&Math.abs(h-z)<1.2){near=pt;best=d}}
   const pts=samples(r,Math.max(25,Math.min(110,Math.ceil(dist(r.p0,r.p3)/4))));
@@ -335,7 +342,7 @@ el('inspectorBody').addEventListener('click',e=>{const b=e.target.closest('butto
   case 'apply':{const r=roads.find(r=>r.id===selectedRoad);if(!r)return;const f=Number(el('editForward').value),n=Number(el('editBackward').value);if(f+n<1)return toast('A road must have at least one lane',true);
     mark();r.forward=clamp(Math.round(f),0,6);r.backward=clamp(Math.round(n),0,6);r.speed=clamp(Number(el('editSpeed').value)||40,10,160);r.width=clamp(Number(el('editWidth').value)||3.5,2.5,5);r.z0=Number(el('editZ0').value);r.z1=Number(el('editZ1').value);commit();toast('Lane network updated');break;}
   case 'delete':deleteRoad();break;
-  case 'demo':mark();roads=example();blocked.clear();forced.clear();closed.clear();portals={};intersectionControls={};odPairs=[{id:'pair1',name:'Pair 1',sourceId:'j:-3500:0:0',targetId:'j:3600:0:0',rate:.8,enabled:true,colorIndex:0}];activePairId='pair1';nextPairNumber=1;selectedRoad=null;selectedLane=null;commit();toast('Sample road network loaded');break;
+  case 'demo':mark();roads=example();blocked.clear();forced.clear();closed.clear();portals={};intersectionControls={};odPairs=samplePairs();activePairId='pair1';nextPairNumber=2;selectedRoad=null;selectedLane=null;commit();toast('Sample road network loaded');break;
   case 'clear':mark();roads=[];blocked.clear();forced.clear();closed.clear();portals={};intersectionControls={};odPairs=[{id:'pair1',name:'Pair 1',sourceId:null,targetId:null,rate:.8,enabled:true,colorIndex:0}];activePairId='pair1';nextPairNumber=1;selectedRoad=null;selectedLane=null;commit();toast('Map cleared');break;
  }
 });
@@ -365,9 +372,9 @@ function updatePortalDrag(p){
 }
 function handleAt(p){const r=roads.find(r=>r.id===selectedRoad);if(!r)return null;for(const [name,point] of [['p0',r.p0],['p3',r.p3],['mid',cubic(r,.5)]])if(dist(p,point)<Math.max(3,10/render.zoom))return name;return null}
 canvas.addEventListener('contextmenu',e=>{e.preventDefault();phase='none';start=end=null;el('actionHint').textContent='Placement cancelled.'});
-canvas.addEventListener('pointerdown',e=>{if(![0,1].includes(e.button))return;canvas.setPointerCapture(e.pointerId);pointer=render.worldOf(e.clientX,e.clientY);
+canvas.addEventListener('pointerdown',e=>{if(![0,1].includes(e.button))return;if(canvas.setPointerCapture)canvas.setPointerCapture(e.pointerId);pointer=render.worldOf(e.clientX,e.clientY);
  if(tool==='pan'||e.button===1||panKey){panStart={screen:{x:e.clientX,y:e.clientY},camera:{...render.camera}};return}
- if(['select','lanes','junctions'].includes(tool)){
+ if(['lanes','junctions'].includes(tool)||(tool==='select'&&e.altKey)){
   const hit=portalAt(pointer,selectedJunction);
   if(hit){mark();portalDrag={...hit,junctionId:selectedJunction,before:JSON.stringify(portals[hit.laneId]?.[hit.which]||null)};selectedLane=hit.laneId;render.invalidateMap();return;}
  }
@@ -375,7 +382,7 @@ canvas.addEventListener('pointerdown',e=>{if(![0,1].includes(e.button))return;ca
   if(priorityPick&&selectedJunction){const chosen=roadAt(pointer);if(chosen){setJunctionPriority(chosen.id);return;}toast('Click a connected road',true);return;}
   const car=vehicleAt(pointer);if(car){selectVehicle(car.id);return;}
   dragging=handleAt(pointer);if(dragging&&selectedRoad){previousRoad=structuredClone(roads.find(r=>r.id===selectedRoad));mark()}
-  else if(!chooseIntersection(pointer)){selectedRoad=roadAt(pointer)?.id||null;selectedJunction=null;selectedLane=null;render.invalidateMap();updateInspector()}return;
+  else if(!chooseIntersection(pointer)){const road=roadAt(pointer);if(road){focusRoad(road.id);el('actionHint').textContent=`Selected ${road.kind} ${road.id}. Click another road or intersection to inspect it.`;}else{selectedRoad=null;selectedJunction=null;selectedLane=null;updateInspector();render.invalidateMap();el('actionHint').textContent='No road at this position. Click inside the pavement or a junction.';}}return;
  }
  if(tool==='lanes'){const connection=connectorAt(pointer);if(connection)return toggleLink(connection);const l=laneAt(pointer,selectedJunction);if(l){focusLane(l);return;}chooseIntersection(pointer);return;}
  if(tool==='endpoints'){chooseNode(pointer);return;}
@@ -465,9 +472,9 @@ try{
   roads=save.roads;blocked=new Set(save.blocked||[]);forced=new Set(save.forced||[]);
   closed=new Set(save.closed||[]);portals=save.portals||{};
   intersectionControls=save.intersectionControls||{};settings={...defaults,...save.settings};setPairsFromData(save);
-  idCount=Math.max(0,...roads.map(r=>Number(r.id.slice(1))||0));
+  idCount=Math.max(0,...roads.map(r=>Number(r.id.slice(1))||0));upgradeSamplePairs();
  }else{
-  roads=example();odPairs=[{id:'pair1',name:'Pair 1',sourceId:'j:-3500:0:0',targetId:'j:3600:0:0',rate:.8,enabled:true,colorIndex:0}];
+  roads=example();odPairs=samplePairs();nextPairNumber=2;
  }
-}catch{roads=example();odPairs=[{id:'pair1',name:'Pair 1',sourceId:'j:-3500:0:0',targetId:'j:3600:0:0',rate:.8,enabled:true,colorIndex:0}];}
+}catch{roads=example();odPairs=samplePairs();nextPairNumber=2;}
 syncUI();setTool('select');rebuild();requestAnimationFrame(frame);

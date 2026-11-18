@@ -1,8 +1,8 @@
-# Traffic Sketch Lab v0.6
+# Traffic Sketch Lab v0.7
 
 A lightweight traffic engineering sandbox with a free-form Bézier road editor, elevation-aware intersections, **explicit lane-to-lane connections**, and a 20 Hz simulation worker. The application is optimized for desktop browsers and includes an optional **portable Windows launcher** (a small native host that opens the game in the user's default browser).
 
-## v0.6 — Congestion and signals
+## v0.7 — Congestion and signals
 
 - Junctions **reserve turning movements only if there is space in the outgoing lane**. A stopped car cannot enter and then block the whole intersection merely because the exit was already full.
 - **Simultaneous non-conflicting crossing movements** are admitted using precomputed geometry-based movement conflicts. A junction is no longer limited to one car at a time.
@@ -72,7 +72,7 @@ This project includes `.github/workflows/build.yml`. Once pushed to GitHub:
 
 1. Every push to `main` or pull request runs the TypeScript build and automated tests.
 2. Successful builds publish a **Windows ZIP** as a GitHub Actions artifact.
-3. Pushing a version tag such as `v0.6.0` creates a **GitHub Release** with the ZIP attached.
+3. Pushing a version tag such as `v0.7.0` creates a **GitHub Release** with the ZIP attached.
 
 The repository should be **private initially** unless the owner chooses to make the project public. Create the remote and push using GitHub authorization. **The presence of this workflow does not mean the repository has been published.**
 
@@ -95,7 +95,7 @@ gh repo create traffic-sketch-lab --private --source=. --remote=origin --push
 No external account credentials are embedded in this repository.
 
 
-## v0.6: inspectable roads, intersections and vehicles
+## v0.7: inspectable roads, intersections and vehicles
 
 - **Select a car** in Select mode to see its live ID, speed, state, route progress, delay, remaining distance, trip pair, and exact planned lane/turn paths. Its route glows cyan; the vehicle receives a yellow outline. Detailed routes are requested for the selected vehicle only.
 - **Select an intersection** to see all incoming/outgoing roads and lane counts. A compact floating menu appears beside it: choose stop, priority, signal, or yield, and click an approach road to prioritize it. The priority axis is shown in amber on the map. Press **P** then click a nearby connected road to choose its priority directly.
@@ -132,3 +132,11 @@ The GitHub Actions **Firefox UI tests** job runs the same tests on a Windows
 runner after each push. It saves an HTML report and screenshots/traces as a
 `Firefox-UI-Report-Windows` workflow artifact. This does not benchmark FPS on
 your computer or guarantee that a real GPU driver behaves identically.
+
+
+### v0.7 geometry and selection repairs
+
+- Select mode targets the **actual paved lane surfaces**, including the full width of multi-lane roads. Select mode takes priority over portal editing; use Junctions/Lane links or **Alt+drag** while an intersection is selected to reposition lane portals.
+- Every lane's road surface and its boundaries are built from the same **trimmed path** as the vehicle simulation, so raw centerlines/markings cannot run underneath junctions. Intersection connectors still attach exactly to their lane portals. Incoming/outgoing node centers are shared for topology; actual paths never converge unnaturally at a single point.
+- The sample map includes two independent, crossing OD pairs: east/west and north/south. Existing custom saves retain their pairs; a saved copy of the original example upgrades to two pairs.
+- Stationary/queued vehicles hold their brake lights even when no longer decelerating, as well as while actively braking or waiting for entry.
