@@ -1,4 +1,4 @@
-TRAFFIC SKETCH LAB v0.7.0 - WINDOWS PORTABLE
+TRAFFIC SKETCH LAB v0.8.0 - WINDOWS PORTABLE
 
 Double-click TrafficSketchLab.exe.
 Your default browser will open automatically, pointed at the local game.

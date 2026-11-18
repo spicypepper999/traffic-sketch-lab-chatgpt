@@ -1,142 +1,54 @@
-# Traffic Sketch Lab v0.7
+# Traffic Sketch Lab
 
-A lightweight traffic engineering sandbox with a free-form Bézier road editor, elevation-aware intersections, **explicit lane-to-lane connections**, and a 20 Hz simulation worker. The application is optimized for desktop browsers and includes an optional **portable Windows launcher** (a small native host that opens the game in the user's default browser).
+A lightweight, top-down **traffic-engineering sandbox** for Windows and desktop browsers. Draw free-form roads, configure individual lanes and intersections, then generate and inspect vehicle trips.
 
-## v0.5 — Congestion and signals
+**Current version: [v0.8.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.8.0)** · [All releases](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/issues)
 
-- Junctions **reserve turning movements only if there is space in the outgoing lane**. A stopped car cannot enter and then block the whole intersection merely because the exit was already full.
-- **Simultaneous non-conflicting crossing movements** are admitted using precomputed geometry-based movement conflicts. A junction is no longer limited to one car at a time.
-- Intersection permits remain reserved until the **rear of the vehicle clears** the connector, then are released.
-- Every traffic-signal approach shows a **three-lamp signal head (red / yellow / green)**, labeled by the approach road at higher zoom. Opposite approaches share a phase even when drawn as separate roads. Phase transitions have a short yellow and all-red interval.
-- Cars have **two rear brake lights**, illuminating while decelerating or waiting. Start-up delay is now applied after a red light turns green.
-- Statistics include **junction crossings** and **average stopped time for active vehicles**. Source/destination traffic pairs and lane endpoint editors are retained.
-- A sustained four-way high-demand regression test checks progress from every direction and checks that no vehicle stays immobilized in a junction connector.
+## Download and play on Windows
 
-## Run
+### Recommended — install the updater once
 
-**No npm install needed to run the checked-in build.** With Node.js 22+:
+1. Open the [latest GitHub release](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/latest) and download **`TrafficSketchLab-Updater.exe`**.
+2. Keep it anywhere convenient (for example, your Desktop). Double-click it to start the game.
+3. On first launch only: because this repository is **private**, create a [fine-grained GitHub personal access token](https://github.com/settings/personal-access-tokens/new) with access limited to **`traffic-sketch-lab-chatgpt`**, permission **Contents: Read-only**. Paste it when prompted. Input is hidden; Windows encrypts the token using your user profile.
+4. Every subsequent launch checks for a new release, updates the cached game if needed, and starts it. **You do not need to download updates manually, install Node.js, or work with source code.**
 
-```sh
-npm start
-```
+The launcher stores the game and its encrypted access token in `%LOCALAPPDATA%\TrafficSketchLab`. It only serves the game on your own PC (`127.0.0.1`), opening your default browser (including Firefox). If GitHub is unavailable, the installed game still works. To clear the stored token, run `TrafficSketchLab-Updater.exe --reset-auth`; to skip checking for updates, run `TrafficSketchLab-Updater.exe --offline`.
 
-Open <http://localhost:4173>. To change the TypeScript source:
+The updater and game executables are **unsigned development builds**. Windows SmartScreen may warn. The updater is not a native graphics engine; the game itself still runs in your browser.
 
-```sh
-npm install
-npm run build
-npm test
-```
+### Alternative — self-contained offline portable copy
 
-### Windows without Node.js
+Download `TrafficSketchLab-Windows.zip` from a [release](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases), extract it, and run `TrafficSketchLab.exe`. This version is completely offline and requires no token, but **does not automatically update**.
 
-Download the `TrafficSketchLab-Windows.zip` artifact from a GitHub Actions build or a tagged **Release**, extract it and double-click `TrafficSketchLab.exe`. The application serves its embedded assets at a local-only `127.0.0.1` address and opens a browser tab automatically. The exe is unsigned, so Windows SmartScreen may warn. No administrator privileges are needed.
+**Important:** Maps saved only by browser autosave are tied to the game's localhost address. v0.8 uses stable port `127.0.0.1:4173` whenever available to keep that address consistent. For important maps, use the game's **Save** button to export JSON backups. Earlier versions used random ports, so their browser autosaves might not appear automatically after upgrading.
 
-To build the executable yourself, run:
+## What you can build
 
-```sh
-npm install
-npm run build
-npm run sync:launcher
-cd launcher
-go build -o TrafficSketchLab.exe .
-```
+- Free-form Bézier streets, avenues, one-way ramps and highways; optional grid and road snapping, bridges and tunnels.
+- Lane-level routing with continuous intersection paths, edited lane portals, allowed/blocked turns, lane splits and merges.
+- Selectable intersections with colored movement arrows, priority controls, yield rules, stop signs and traffic signals.
+- Individual vehicle inspection (speed, delay, planned route), following distance and braking behavior.
+- Multiple independently controlled source/destination traffic pairs with statistics and a 20 Hz traffic worker.
+- JSON map save/load, undo/redo, cached static road rendering and a low-end graphics setting.
 
-Use Go 1.23+. The `launcher/go.mod` file makes the same command work in Windows PowerShell after `npm run sync:launcher`.
+**Controls:** **V** Select · **P** choose priority approach · **G** grid · **C** curve · **Space + drag** pan · mouse wheel zoom · **Delete** remove · **Ctrl+Z** undo · **Esc** cancel. For lane endpoints, select an intersection and use the Intersection/Lane Links editor (or **Alt+drag** in Select mode).
 
-## Interaction and editing
+## Version history
 
-- **Select:** Click a road or intersection. The selected object is outlined in gold. Drag road endpoints or the center bend handle to reshape a road.
-- **Intersections / Lane links:** Click an intersection. Every allowed lane-to-lane movement is displayed as a **solid, distinct-colored curve with a directional arrow**. Each approach's individual incoming and outgoing lane endpoint is displayed as an amber or teal **draggable portal handle**. Moving a portal rebuilds its lane geometry and **all** turning connectors that meet at that endpoint; the simulation graph and graphics share exact endpoints. Click a connector or use the inspector's ALLOW/BLOCK controls to edit lane movements, create 1-to-many links or many-to-1 merges, or close lanes. Use **Reset** alongside a portal to restore generated geometry.
-- **Trip nodes:** Click the desired source and target nodes. The route respects allowed directed lane connections. Cars only travel between selected nodes; no random trips.
-- **Multiple traffic demands:** Click **+ Add pair** in the traffic panel. Assign each pair its own source and target, name, demand rate (cars/s), and enable toggle. The source/target nodes for each pair are shown with matching colored markers. Vehicles retain their pair identity. Save/load persists all pairs.
-- **Roads:** Four presets; straight or three-click curved drawing; grid and road snapping; heights 0m, +6m, and −6m for ground roads, bridges, tunnels and ramps.
-- **Simulation:** Pause, 1×–4× speed, queue 25 vehicles for the selected pair, and tune driver following gap, reaction delay and following time. Dynamic cars and static roads render on separate canvases with cached geometry and fast (1× pixel) drawing.
-- **Persistence:** Save/load a JSON map, automatic browser saving, and undo/redo. JSON save version 4 accepts previous maps from v0.1–v0.3.
+| Version | Summary | Release |
+| --- | --- | --- |
+| **0.8.0** | One-time Windows auto-updater, consistent localhost origin, documentation cleanup | [v0.8.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.8.0) |
+| **0.7.0** | Full-width road selection, brake lights for queues, two crossing traffic pairs, trimmed road rendering | [v0.7.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.7.0) |
+| **0.6.0** | Vehicle route inspector, road/intersection navigation and priority-road editing | [v0.6.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.6.0) |
+| **0.5 and earlier** | Simulation foundation, editable lanes and intersections, demand pairs, signals and gridlock prevention | Historical prototypes (not all have GitHub Releases) |
 
-## Architecture
+See [CHANGELOG.md](CHANGELOG.md) for details and remaining limitations.
 
-- `src/network.ts` — elevation-aware road/node segmentation, lane generation, per-lane editable portals, intersection entity inventories, permitted connectors, deterministic directed routing.
-- `src/geometry.ts` — Bézier curves, offsets, intersection and arc-length functions.
-- `src/sim-worker.ts` — 20 Hz independent vehicle simulation, intersection conflict reservations, car-following, and multiple source→target demand queues.
-- `src/signals.ts` — shared traffic-light phase logic for simulation and graphics.
-- `src/renderer.ts` — cached static map, vehicle overlay, lane/turn/selection/portal drawing.
-- `src/main.ts` — editor, inspector, vehicle settings, multiple OD pairs, input and saved state.
-- `launcher/main.go` — standard-library-only portable Windows executable, embedded static assets.
-- `scripts/sync-launcher.mjs` — copies build artifacts into Go's embedded asset directory.
-- `test/` — Node tests including geometry, portal continuity, multi-pair trips, renderer caching and UI bootstrapping.
+## Development and testing
 
-## GitHub repository & automatic builds
+Source contributors: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) describes project architecture, TypeScript builds, test commands, and Windows packaging. **Players do not need any of these tools.**
 
-This project includes `.github/workflows/build.yml`. Once pushed to GitHub:
+Every push runs automated simulation/unit tests and actual Firefox UI tests on GitHub Actions. **Each new version bump in `package.json` automatically builds and publishes a new portable Windows GitHub Release**, including both the offline game ZIP and the reusable updater. Downloads are private to repository collaborators.
 
-1. Every push to `main` or pull request runs the TypeScript build and automated tests.
-2. Successful builds publish a **Windows ZIP** as a GitHub Actions artifact.
-3. Pushing a version tag such as `v0.7.0` creates a **GitHub Release** with the ZIP attached.
-
-The repository should be **private initially** unless the owner chooses to make the project public. Create the remote and push using GitHub authorization. **The presence of this workflow does not mean the repository has been published.**
-
-For direct CLI publishing after logging in with `gh auth login`:
-
-```sh
-gh repo create traffic-sketch-lab --private --source=. --remote=origin --push
-```
-
-## Known limitations
-
-- The native Windows EXE is a **launcher**, not a native renderer. Actual FPS depends on the browser and hardware. The earlier major redraw bottleneck was reduced via static-map caching; performance on low-end PCs still needs on-device benchmarking.
-- When moving a portal, the nearby lane is smoothly curved into its new endpoint; highly extreme edits can produce unnatural bends. Fine-grained connector Bézier handle editing is not implemented yet.
-- Mid-road lane changes and cooperative highway merging are still pending.
-- Collision prevention currently uses a conservative 2D conflict-corridor approximation, not full swept-volume physics. Under unusual hand-edited connector curves, stress-test the junction before using it for high demand.
-- Very short approach segments, overlapping intersections, and severe arbitrary portal deformations remain limited. Mid-road lane changes, adaptive signals and roundabouts are still planned.
-- Dense overlapping junction footprints require further topology validation.
-- Automated unit/integration tests run in Node; full graphical end-to-end testing on Windows is still needed.
-
-No external account credentials are embedded in this repository.
-
-
-## v0.6: inspectable roads, intersections and vehicles
-
-- **Select a car** in Select mode to see its live ID, speed, state, route progress, delay, remaining distance, trip pair, and exact planned lane/turn paths. Its route glows cyan; the vehicle receives a yellow outline. Detailed routes are requested for the selected vehicle only.
-- **Select an intersection** to see all incoming/outgoing roads and lane counts. A compact floating menu appears beside it: choose stop, priority, signal, or yield, and click an approach road to prioritize it. The priority axis is shown in amber on the map. Press **P** then click a nearby connected road to choose its priority directly.
-- **Select a road** to list every intersection it feeds and receives from. Click those links to jump between the associated entities.
-- Opposing aligned approach segments share **priority** even when built as different road IDs, matching how the signal-phase axis already works.
-- Vehicle metadata is carried only for the selected car, reducing unnecessary cross-thread traffic.
-
-**Important:** Any structural/network-control edit still resets active traffic. A future live-editing update will preserve or safely reroute vehicles across graph changes.
-
-## Real Firefox UI tests (Windows 11 and GitHub Actions)
-
-The unit tests (`npm test`) exercise the road network and traffic logic, but they
-cannot detect all mouse, drawing, browser worker or DOM problems. The Playwright
-end-to-end tests in `e2e/` open the actual game in Firefox, capture screenshots,
-and exercise map zoom, controls and intersection editing.
-
-On Windows 11, install Node.js 22 or later, then from a terminal in this folder:
-
-```powershell
-npm install
-npm run build
-npx playwright install firefox
-npm run test:browser:headed
-```
-
-For background testing, use `npm run test:browser`. If a test fails, inspect
-`playwright-report/` and `test-results/`, or run `npx playwright show-report`.
-Playwright downloads a testing copy of Firefox; it does **not** control the
-Firefox installation you normally use. For a bug specific to your own Firefox,
-open the game normally, press Ctrl+Shift+J for Firefox's browser console and
-capture the errors and steps to reproduce it.
-
-The GitHub Actions **Firefox UI tests** job runs the same tests on a Windows
-runner after each push. It saves an HTML report and screenshots/traces as a
-`Firefox-UI-Report-Windows` workflow artifact. This does not benchmark FPS on
-your computer or guarantee that a real GPU driver behaves identically.
-
-
-### v0.7 geometry and selection repairs
-
-- Select mode targets the **actual paved lane surfaces**, including the full width of multi-lane roads. Select mode takes priority over portal editing; use Junctions/Lane links or **Alt+drag** while an intersection is selected to reposition lane portals.
-- Every lane's road surface and its boundaries are built from the same **trimmed path** as the vehicle simulation, so raw centerlines/markings cannot run underneath junctions. Intersection connectors still attach exactly to their lane portals. Incoming/outgoing node centers are shared for topology; actual paths never converge unnaturally at a single point.
-- The sample map includes two independent, crossing OD pairs: east/west and north/south. Existing custom saves retain their pairs; a saved copy of the original example upgrades to two pairs.
-- Stationary/queued vehicles hold their brake lights even when no longer decelerating, as well as while actively braking or waiting for entry.
+[Build status and test reports](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/actions)
