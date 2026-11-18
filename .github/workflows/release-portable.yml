@@ -1,6 +1,6 @@
 name: Publish portable Windows release
 
-# The initial push publishes v0.6.0. Future releases can be launched
+# Publish v0.7.0 from source. Future releases can be launched
 # from Actions > Publish portable Windows release > Run workflow.
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         description: "Release version tag (for example v0.6.1)"
         type: string
         required: true
-        default: "v0.6.0"
+        default: "v0.7.0"
   push:
     branches: [main]
     paths:
@@ -58,8 +58,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_TAG: ${{ inputs.tag }}
         run: |
-          $tag = if ($env:REQUESTED_TAG) { $env:REQUESTED_TAG } else { "v0.6.0" }
-          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "Expected a version tag like v0.6.0" }
+          $tag = if ($env:REQUESTED_TAG) { $env:REQUESTED_TAG } else { "v0.7.0" }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw "Expected a version tag like v0.7.0" }
           gh release view "$tag" --repo "$env:GITHUB_REPOSITORY" > $null 2>&1
           if ($LASTEXITCODE -eq 0) {
             gh release upload "$tag" TrafficSketchLab-Windows.zip --clobber --repo "$env:GITHUB_REPOSITORY"
