@@ -28,7 +28,7 @@ test('Firefox mouse wheel zoom and inspector controls respond', async ({page}) =
   await page.locator('#helpClose').click();
   await expect(page.locator('#helpBackdrop')).toBeHidden();
   await page.locator('#addPair').click();
-  await expect(page.locator('#pairList')).toContainText('Pair 2');
+  await expect(page.locator('#pairList')).toContainText('Pair 3');
   expect(errors).toEqual([]);
 });
 

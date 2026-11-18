@@ -2,7 +2,7 @@
 
 A lightweight traffic engineering sandbox with a free-form Bézier road editor, elevation-aware intersections, **explicit lane-to-lane connections**, and a 20 Hz simulation worker. The application is optimized for desktop browsers and includes an optional **portable Windows launcher** (a small native host that opens the game in the user's default browser).
 
-## v0.7 — Congestion and signals
+## v0.5 — Congestion and signals
 
 - Junctions **reserve turning movements only if there is space in the outgoing lane**. A stopped car cannot enter and then block the whole intersection merely because the exit was already full.
 - **Simultaneous non-conflicting crossing movements** are admitted using precomputed geometry-based movement conflicts. A junction is no longer limited to one car at a time.
@@ -95,7 +95,7 @@ gh repo create traffic-sketch-lab --private --source=. --remote=origin --push
 No external account credentials are embedded in this repository.
 
 
-## v0.7: inspectable roads, intersections and vehicles
+## v0.6: inspectable roads, intersections and vehicles
 
 - **Select a car** in Select mode to see its live ID, speed, state, route progress, delay, remaining distance, trip pair, and exact planned lane/turn paths. Its route glows cyan; the vehicle receives a yellow outline. Detailed routes are requested for the selected vehicle only.
 - **Select an intersection** to see all incoming/outgoing roads and lane counts. A compact floating menu appears beside it: choose stop, priority, signal, or yield, and click an approach road to prioritize it. The priority axis is shown in amber on the map. Press **P** then click a nearby connected road to choose its priority directly.
