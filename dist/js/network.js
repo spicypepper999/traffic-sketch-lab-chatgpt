@@ -10,6 +10,23 @@ const elev = (r, t) => r.z0 + (r.z1 - r.z0) * t;
 const nearly = (a, b) => Math.abs(a - b) < 1e-7;
 const direction = p => unit(sub(p.points.at(-1), p.points.at(-2)));
 const startDirection = p => unit(sub(p.points[1], p.points[0]));
+export function configureJunction(node, override = {}, incoming = [], outgoing = []) {
+ const types = ['stop', 'priority', 'signal', 'yield', 'free'];
+ const type = types.includes(override.type) ? override.type : (node.arms >= 3 ? 'stop' : 'free');
+ const priorityRoad = node.roadIds.includes(override.priorityRoad) ? override.priorityRoad : node.roadIds[0];
+ node.control = {type, priorityRoad, cycle: clamp(Number(override.cycle) || 28, 12, 120)};
+ node.signalGroups = {};
+ if (node.intersection) node.intersection.control = node.control;
+ if (!node.isJunction || !['signal', 'priority'].includes(type)) return;
+
+ // Separately drawn but opposing approaches share a phase.
+ const seed = incoming.find(lane => lane.roadId === priorityRoad) ||
+              outgoing.find(lane => lane.roadId === priorityRoad);
+ const axis = seed ? (seed.endNode === node.id ? direction(seed) : startDirection(seed)) : {x:1, y:0};
+ for (const lane of incoming) {
+  node.signalGroups[lane.id] = Math.abs(dot(axis, direction(lane))) >= .75 ? 0 : 1;
+ }
+}
 const junctionId = (p, z) => `j:${Math.round(p.x * 10)}:${Math.round(p.y * 10)}:${Math.round(z * 10)}`;
 function closestToPolyline(p, list) {
     let best = { d: Infinity, t: 0, p };
@@ -271,11 +288,6 @@ export function compileNetwork(roads, blockedInput = [], forcedInput = [], close
         // Radius covers the complete road cross-section, preserving a continuous paved surface.
         const w = Math.max(0, ...touches.map(r => r.width * Math.max(r.forward, r.backward)));
         n.radius = n.isJunction ? clamp(w + 2.5, 6, 31) : 0;
-        const override = controlInput[n.id] || {};
-        const type = ['stop', 'priority', 'signal', 'yield', 'free'].includes(override.type) ? override.type : (n.arms >= 3 ? 'stop' : 'free');
-        const priorityRoad = n.roadIds.includes(override.priorityRoad) ? override.priorityRoad : n.roadIds[0];
-        n.control = { type, priorityRoad, cycle: clamp(Number(override.cycle) || 28, 12, 120) };
-        n.signalGroups = {}; // Assigned after generating lane geometry.
     }
     const nodesById = new Map(nodes.map(n => [n.id, n]));
     for (const r of roads) {
@@ -308,19 +320,6 @@ export function compileNetwork(roads, blockedInput = [], forcedInput = [], close
             }
         }
     }
-    // Group signal approaches by *physical axis*, not by road ID. A user
-    // may build a four-way intersection out of four individually drawn roads.
-    // Opposing approaches must share the same green phase in that case.
-    for (const n of nodes) {
-        if (!n.isJunction || !['signal', 'priority'].includes(n.control.type))
-            continue;
-        const relevant = lanes.filter(l => l.endNode === n.id);
-        const seed = relevant.find(l => l.roadId === n.control.priorityRoad) ||
-            lanes.find(l => l.startNode === n.id && l.roadId === n.control.priorityRoad);
-        const axis = seed ? (seed.endNode === n.id ? direction(seed) : startDirection(seed)) : { x: 1, y: 0 };
-        for (const l of relevant)
-            n.signalGroups[l.id] = Math.abs(dot(axis, direction(l))) >= .75 ? 0 : 1;
-    }
     const incoming = new Map(), outgoing = new Map();
     for (const l of lanes) {
         if (!incoming.has(l.endNode))
@@ -332,6 +331,7 @@ export function compileNetwork(roads, blockedInput = [], forcedInput = [], close
     }
     for (const n of nodes) {
         n.incoming = (incoming.get(n.id) || []).map(l => l.id);
+        configureJunction(n, controlInput[n.id] || {}, incoming.get(n.id), outgoing.get(n.id));
         n.outgoing = (outgoing.get(n.id) || []).map(l => l.id);
         for (const a of incoming.get(n.id) || [])
             for (const b of outgoing.get(n.id) || []) {

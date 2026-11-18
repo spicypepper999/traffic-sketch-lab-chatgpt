@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { clamp } from './geometry.js';
-import { findRoute } from './network.js';
+import { configureJunction, findRoute } from './network.js';
 import { signalAspect } from './signals.js';
 const DT = .05;
 let running = true, speedMult = 1, legacyRate = .8, headway = 1.5, gapMin = 2.5, delay = .7;
@@ -360,6 +360,14 @@ self.onmessage = e => {
         case 'INIT':
             initialize(m.network);
             break;
+ case 'SET_JUNCTION_CONTROL':{
+  const node=junctions.get(m.id);
+  if(!node?.isJunction)break;
+  const lanes=ids=>ids.map(id=>paths.get(id));
+  configureJunction(node,m.control,lanes(node.incoming),lanes(node.outgoing));
+  // Previously admitted drivers retain their reservations until their rear clears.
+  break;
+ }
         case 'SELECT_VEHICLE':
             selectedVehicleId = Number.isInteger(m.id) ? m.id : null;
             snapshot();

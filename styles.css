@@ -75,3 +75,49 @@
 .popup-arms{display:grid;grid-template-columns:1fr 1fr;gap:5px}.popup-arms button{display:grid;gap:4px;text-align:left}.popup-arms button small{font-size:9px;color:#8aa296}.popup-arms button.priority{background:#fff2d5;color:#865c17;border-color:#daba66}.popup-arms button.priority small{color:#997e3e}.popup-pick{display:block;width:100%;margin-top:9px}.popup-footer{color:#9aaa9b;font-size:9px;text-align:center;margin-top:7px}
 .relation-list{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0}.relation-button{border:1px solid #c8ded3;background:#eaf5ed;color:#477563;font-size:10px;font-weight:750;cursor:pointer;padding:6px;border-radius:5px}.relation-button:hover{background:#d4e9da}.relation-button.priority{border-color:#d6bc73;background:#fff1d2;color:#875f1b}
 .car-facts{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.car-facts>div{font-size:10px;color:#82998a;border:1px solid #dce6dd;background:#f3f7ef;padding:7px;border-radius:6px;min-width:0}.car-facts b{display:block;margin-top:4px;color:#365b4f;font-size:11px;overflow-wrap:anywhere}
+
+/* Workspace chrome uses charcoal, warm paper, and a single teal selection accent. */
+.topbar { background:#20383c; border-bottom:2px solid #2d5557; box-shadow:0 3px 16px #152f3526; }
+.identity strong { color:#fcfaf1; }
+.identity em { color:#f4c382; }
+.identity small,.network-badge { color:#b2c9c4; }
+.logo { background:#345459; border:1px solid #698780; }
+.version { background:#355154; color:#d5e7e0; }
+.header-actions .quiet { background:#2e494e; border-color:#587174; color:#f2f5ec; }
+.header-actions .quiet:hover { background:#426067; }
+.toolbar,.inspector { background:#fcfcf7; border-color:#bdcdc4; box-shadow:0 5px 18px #19372a20; }
+.tool.active { background:#245c60; color:white; box-shadow:inset 3px 0 #8be2d4; }
+.tool.active small { color:#c5ede4; }
+.tool small,.muted,.panel-label,.tool-heading,.metric small,.range-title { color:#526b61; }
+.tool-heading,.panel-label { letter-spacing:1.15px; }
+.metric { background:#edf3ed; border-color:#d4dfd6; }
+.metric strong,.panel-title { color:#224e50; }
+.sim-btn.play,.popup-modes button.active { background:#246568; color:white; }
+.bottom-status { max-width:max(180px,calc(50vw - 340px)); }
+:focus-visible { outline:3px solid #16888c; outline-offset:2px; }
+#inspectorToggle { display:none; }
+@media(max-width:820px){
+ #inspectorToggle { display:inline-block; }
+ #inspectorToggle[aria-expanded=true] { background:#d8f4e9; color:#204f50; }
+ .inspector.expanded { display:block; top:auto; bottom:84px; right:8px; left:76px; width:auto; max-height:38vh; z-index:8; }
+ .toolbar { width:60px; padding:8px 4px; }
+ .toolbar .tool { display:grid; justify-items:center; gap:3px; padding:5px 1px; min-height:40px; }
+ .toolbar .tool span:last-child { font-size:8px; }
+ .toolbar .tool small,.toolbar .tiny-tip,.toolbar .tool-heading,.toolbar .spacer { display:none; }
+ .toolbar .tool-separator { margin:6px; flex-shrink:0; }
+ .toolbar .toggle-row { flex-wrap:wrap; justify-content:center; text-align:center; font-size:9px; margin:7px 0; }
+ .toolbar .toggle-row kbd { display:none; }
+ .toolbar .alt-label { font-size:8px; margin:8px 0 3px; }
+ .toolbar select { padding:3px 0; font-size:9px; }
+ .junction-popup { display:none; }
+ .inspector.expanded .panel-title { position:sticky; top:-20px; background:#fcfcf7; padding:8px 0; z-index:1; }
+}
+@media(max-width:600px){
+ .topbar { padding:0 8px; height:53px; }
+ .identity { gap:6px; }.logo { display:none; }.identity strong { font-size:12px; letter-spacing:.4px; }.identity small { font-size:7px; letter-spacing:.3px; }.version { display:none; }
+ .header-actions { gap:3px; }.header-actions .quiet { font-size:10px; padding:7px 5px; }
+ .toolbar { top:60px; bottom:82px; left:5px; }
+ .simbar { left:5px; right:5px; bottom:5px; padding:6px; gap:5px; justify-content:space-around; min-height:53px; flex-wrap:wrap; }
+ .simbar .sim-separator,.world-info { display:none; }.simbar .demand { width:68px; }.simbar .sim-btn { font-size:10px; padding:7px; }.simbar .speed-buttons button { padding:5px; }
+ .help-dialog { max-height:90vh; overflow:auto; padding:20px; }.help-columns { grid-template-columns:1fr; gap:2px; }
+}

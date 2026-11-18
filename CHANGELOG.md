@@ -2,6 +2,12 @@
 
 Project releases use version tags `vMAJOR.MINOR.PATCH`. These are release versions, not save-file schema versions.
 
+## v0.9.0 — Live traffic editing and selection
+
+- Fix Select clicks failing once vehicles enter the simulation. Highlight selected pavement across its full width.
+- Change control modes, signal cycles and priority approaches during a trip. Undo and redo individual junction edits while preserving traffic and crossing reservations.
+- Improve panel contrast and expose the inspector on compact screens. Canceling a road drag restores its original geometry.
+
 ## v0.8.0 — Updating and distribution
 
 - Added a **one-time portable Windows updater**. Checks the GitHub Releases API and downloads only new game builds; installed builds are cached and work offline.
@@ -55,7 +61,6 @@ Project releases use version tags `vMAJOR.MINOR.PATCH`. These are release versio
 
 ## Current limitations
 
-- The updater needs one-time, read-only GitHub authorization while the repository remains private. It cannot silently access a private release without permission.
 - The Windows launcher runs a local browser game, not a native GPU renderer. On-device graphics performance is hardware-dependent.
 - Mid-road cooperative lane changes, advanced merges, adaptive signal optimization, roundabout generation and complex overlapping junction validation remain incomplete.
 - Structural network edits still reset the moving traffic simulation.

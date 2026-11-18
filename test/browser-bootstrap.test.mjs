@@ -7,19 +7,21 @@ import {readFileSync} from 'node:fs';
 test('editor initializes sample map, selects fixed nodes, and draws with Canvas2D',async()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
- const noop=()=>{};const listeners=new Map(),messages=[];let lastSave=null;
+ const noop=()=>{};const listeners=new Map(),messages=[];let lastSave=null,worker;
  const on=(id,type,fn)=>listeners.set(`${id}:${type}`,fn);
  const ctx=new Proxy({}, {get:(obj,key)=>key in obj?obj[key]:noop,set:(obj,key,value)=>(obj[key]=value,true)});
  const elts=new Map(ids.map(id=>[id,{
   id,value:'0',textContent:'',innerHTML:'',disabled:false,checked:false,style:{},clientWidth:1500,clientHeight:1000,
   classList:{toggle:noop,add:noop,remove:noop},addEventListener(type,fn){on(id,type,fn)},getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture:noop,
-  getContext:()=>ctx,append:noop,click:noop,
+  getContext:()=>ctx,append:noop,click:noop,setAttribute(name,value){this[name]=value},getAttribute(name){return this[name]},
  }]));
  globalThis.devicePixelRatio=1;
  globalThis.document={getElementById:id=>elts.get(id),querySelectorAll:()=>[],createElement:()=>({className:'',textContent:'',remove:noop})};
- globalThis.window={addEventListener:noop};
+ globalThis.window={addEventListener:(type,fn)=>on('window',type,fn)};
+ globalThis.HTMLInputElement=class {};
+ globalThis.HTMLSelectElement=class {};
  globalThis.localStorage={getItem:()=>null,setItem:(key,value)=>{lastSave=value}};
- globalThis.Worker=class{postMessage(message){messages.push(message)} };
+ globalThis.Worker=class{constructor(){worker=this}postMessage(message){messages.push(message)} };
  globalThis.requestAnimationFrame=()=>{};
  await import('../dist/js/main.js');
  assert.match(elts.get('tripStatus').textContent,/Route found/);
@@ -34,6 +36,13 @@ test('editor initializes sample map, selects fixed nodes, and draws with Canvas2
  // Click a real intersection, then ensure every lane path is listed without a JS crash.
  const down=listeners.get('world:pointerdown');
  const evt=(x,y)=>({button:0,pointerId:1,clientX:750+x*1.25,clientY:500+y*1.25,shiftKey:false});
+ const network=messages.findLast(m=>m.type==='INIT').network;
+ const lane=network.lanes[0];
+ worker.onmessage({data:{type:'SNAPSHOT',vehicles:[{id:7,pathId:lane.id,s:0,speed:0}],stats:{
+  active:1,averageSpeed:0,completed:0,queued:1,pendingDemand:0,updateMs:0,simTime:2
+ }}});
+ down(evt(lane.points[0].x,lane.points[0].y));
+ assert.match(elts.get('inspectorTitle').textContent,/Vehicle #7/);
  down(evt(-180,5));
  assert.match(elts.get('inspectorTitle').textContent,/Road properties/,'clicking inside road surface selects road in Select mode');
  down(evt(-80,0));
@@ -43,6 +52,20 @@ test('editor initializes sample map, selects fixed nodes, and draws with Canvas2
  const map=messages.findLast(m=>m.type==='INIT').network;
  const intersection=map.intersections.find(i=>Math.abs(i.center.x+80)<1&&Math.abs(i.center.y)<1);
  assert.ok(intersection,'expected sample junction');
+ const originalControl=intersection.control.type;
+ const newControl=originalControl==='signal'?'stop':'signal';
+ const start=messages.length;
+ listeners.get('junctionMenu:click')({target:{closest:()=>({dataset:{menu:'type',value:newControl}})}});
+ const key=(key,shiftKey=false)=>listeners.get('window:keydown')({
+  key,shiftKey,ctrlKey:true,target:{},preventDefault:noop
+ });
+ key('z');
+ assert.equal(JSON.parse(lastSave).intersectionControls[intersection.id],undefined);
+ key('z',true);
+ assert.equal(JSON.parse(lastSave).intersectionControls[intersection.id].type,newControl);
+ assert.deepEqual(messages.slice(start).map(m=>[m.type,m.control.type]),[
+  ['SET_JUNCTION_CONTROL',newControl],['SET_JUNCTION_CONTROL',originalControl],['SET_JUNCTION_CONTROL',newControl]
+ ]);
  const inbound=map.lanes.find(l=>l.id===intersection.incoming[0]);
  const handle=inbound.points.at(-1);
  down({...evt(handle.x,handle.y),altKey:true});

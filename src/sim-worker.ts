@@ -1,6 +1,6 @@
 // @ts-nocheck
 import {clamp} from './geometry.js';
-import {findRoute} from './network.js';
+import {configureJunction,findRoute} from './network.js';
 import {signalAspect} from './signals.js';
 
 const DT=.05;
@@ -232,6 +232,14 @@ setInterval(()=>{
 },50);
 self.onmessage=e=>{const m=e.data;switch(m.type){
  case 'INIT':initialize(m.network);break;
+ case 'SET_JUNCTION_CONTROL':{
+  const node=junctions.get(m.id);
+  if(!node?.isJunction)break;
+  const lanes=ids=>ids.map(id=>paths.get(id));
+  configureJunction(node,m.control,lanes(node.incoming),lanes(node.outgoing));
+  // Previously admitted drivers retain their reservations until their rear clears.
+  break;
+ }
  case 'SELECT_VEHICLE':selectedVehicleId=Number.isInteger(m.id)?m.id:null;snapshot();break;
  case 'SET_PAIRS':setPairs(m.pairs);break;
  case 'SET_PAIR_RATES':updatePairRates(m.pairs);break;

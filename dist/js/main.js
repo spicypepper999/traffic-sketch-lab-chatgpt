@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { Renderer } from './renderer.js';
-import { compileNetwork, PRESETS, findRoute } from './network.js';
-import { clamp, cubic, dist, samples, nearestLine, controlStraight, controlBend } from './geometry.js';
+import { compileNetwork, configureJunction, PRESETS, findRoute } from './network.js';
+import { at, clamp, cubic, dist, samples, nearestLine, controlStraight, controlBend } from './geometry.js';
 import { movementColor, pairColor } from './colors.js';
 import { roadJunctions, junctionRoads, priorityApproaches } from './inspection.js';
 import { hitRoad, hitJunction } from './hit-test.js';
@@ -53,8 +53,10 @@ function upgradeSamplePairs() {
 }
 function asSave() { return { version: 4, roads, blocked: [...blocked], forced: [...forced], closed: [...closed], odPairs, activePairId, portals, intersectionControls, settings }; }
 function snapshot() { return JSON.stringify({ roads, blocked: [...blocked], forced: [...forced], closed: [...closed], odPairs, activePairId, portals, intersectionControls }); }
-function mark() { undoStack.push(snapshot()); if (undoStack.length > 80)
-    undoStack.shift(); redoStack.length = 0; }
+function historyEntry(nodeId){
+ return nodeId ? {nodeId, control:intersectionControls[nodeId]} : {map:snapshot()};
+}
+function mark(nodeId=null){undoStack.push(historyEntry(nodeId));if(undoStack.length>80)undoStack.shift();redoStack.length=0}
 function restore(json) {
     const data = JSON.parse(json);
     roads = data.roads;
@@ -83,10 +85,15 @@ function setPairsFromData(data) {
     nextPairNumber = Math.max(1, ...odPairs.map(p => Number(p.id.replace('pair', '')) || 0));
     activePairId = odPairs.some(p => p.id === data.activePairId) ? data.activePairId : odPairs[0].id;
 }
-function undo() { if (!undoStack.length)
-    return toast('Nothing to undo'); redoStack.push(snapshot()); restore(undoStack.pop()); toast('Undid edit'); }
-function redo() { if (!redoStack.length)
-    return toast('Nothing to redo'); undoStack.push(snapshot()); restore(redoStack.pop()); toast('Redid edit'); }
+function restoreEdit(from,to,message){
+ const entry=from.pop();
+ to.push(historyEntry(entry.nodeId));
+ if(entry.nodeId) applyControl(entry.nodeId,entry.control);
+ else {restore(entry.map);persist();}
+ toast(message);
+}
+function undo(){if(!undoStack.length)return toast('Nothing to undo');restoreEdit(undoStack,redoStack,'Undid edit')}
+function redo(){if(!redoStack.length)return toast('Nothing to redo');restoreEdit(redoStack,undoStack,'Redid edit')}
 function rebuild() {
     selectedVehicleId = null;
     selectedVehicleDetail = null;
@@ -391,29 +398,29 @@ function focusJunction(id) {
     updateInspector();
     render.invalidateMap();
 }
-function setJunctionControl(type) {
-    const n = network.nodes.find(n => n.id === selectedJunction);
-    if (!n)
-        return;
-    if (!['stop', 'priority', 'signal', 'yield', 'free'].includes(type))
-        return;
-    mark();
-    intersectionControls[n.id] = { ...n.control, type };
-    commit();
-    toast(`Intersection: ${type}`);
+function setJunctionControl(type){
+ const n=network.nodes.find(n=>n.id===selectedJunction);if(!n)return;
+ if(!['stop','priority','signal','yield','free'].includes(type))return;
+ if(n.control.type===type)return;
+ mark(n.id);applyControl(n.id,{...n.control,type});toast(`Intersection: ${type}`);
 }
-function setJunctionPriority(roadId) {
-    const n = network.nodes.find(n => n.id === selectedJunction);
-    if (!n || !n.roadIds.includes(roadId))
-        return toast('Click a road directly connected to this intersection', true);
-    priorityPick = false;
-    const targetType = n.control.type === 'signal' ? 'signal' : 'priority';
-    if (n.control.type === targetType && n.control.priorityRoad === roadId)
-        return updateInspector();
-    mark();
-    intersectionControls[n.id] = { ...n.control, type: targetType, priorityRoad: roadId };
-    commit();
-    toast(targetType === 'signal' ? `${roadId} is first green (including opposite aligned approaches)` : `${roadId} now has priority (including opposite aligned approaches)`);
+function applyControl(id,override){
+ const node=network.nodes.find(n=>n.id===id);
+ if(!node?.isJunction)return;
+ if(override)intersectionControls[id]=override;
+ else delete intersectionControls[id];
+ const lanes=ids=>ids.map(laneId=>pathLookup.get(laneId));
+ configureJunction(node,override,lanes(node.incoming),lanes(node.outgoing));
+ send({type:'SET_JUNCTION_CONTROL',id,control:node.control});
+ updateInspector();render.invalidateMap();persist();
+}
+function setJunctionPriority(roadId){
+ const n=network.nodes.find(n=>n.id===selectedJunction);if(!n||!n.roadIds.includes(roadId))return toast('Click a road directly connected to this intersection',true);
+ priorityPick=false;
+ const targetType=n.control.type==='signal'?'signal':'priority';
+ if(n.control.type===targetType&&n.control.priorityRoad===roadId)return updateInspector();
+ mark(n.id);applyControl(n.id,{...n.control,type:targetType,priorityRoad:roadId});
+ toast(targetType==='signal'?`${roadId} is first green (including opposite aligned approaches)`:`${roadId} now has priority (including opposite aligned approaches)`);
 }
 function selectVehicle(id) {
     if (!Number.isInteger(id))
@@ -585,9 +592,20 @@ function chooseNode(p) {
     if (sourceId && targetId && !currentRoute)
         toast('No legal route connects those nodes; change lane links', true);
 }
-function updateInspector() {
-    const body = el('inspectorBody');
-    updateIntersectionMenu();
+let inspectorSelection=null;
+function showInspector(open){
+ el('inspector').classList.toggle('expanded',open);
+ el('inspectorToggle').setAttribute('aria-expanded',String(open));
+}
+el('inspectorToggle').onclick=()=>showInspector(el('inspectorToggle').getAttribute('aria-expanded')!=='true');
+function updateInspector(){const body=el('inspectorBody');updateIntersectionMenu();
+ const selection=selectedVehicleId!==null?'vehicle:'+selectedVehicleId:selectedJunction||selectedRoad;
+ if(selection&&selection!==inspectorSelection){
+  el('inspector').scrollTop=0;
+  showInspector(true);
+ }
+ inspectorSelection=selection;
+
     if (tool === 'select' && selectedVehicleId !== null) {
         el('inspectorTitle').textContent = 'Vehicle #' + selectedVehicleId;
         body.innerHTML = vehicleInspector();
@@ -678,9 +696,8 @@ el('inspectorBody').addEventListener('click', e => {
         case 'applyJunction': {
             if (!selectedJunction)
                 return;
-            mark();
-            intersectionControls[selectedJunction] = { type: el('editControl').value, priorityRoad: el('editPriority').value, cycle: Number(el('editCycle').value) };
-            commit();
+            mark(selectedJunction);
+            applyControl(selectedJunction, { type: el('editControl').value, priorityRoad: el('editPriority').value, cycle: Number(el('editCycle').value) });
             toast('Junction rules updated');
             break;
         }
@@ -916,20 +933,24 @@ canvas.addEventListener('pointerup', () => { if (portalDrag) {
     dragging = null;
     previousRoad = null;
 } panStart = null; });
-canvas.addEventListener('pointercancel', () => { if (portalDrag) {
-    const { laneId, which, before } = portalDrag;
-    if (before === 'null') {
-        delete portals[laneId]?.[which];
-        if (!Object.keys(portals[laneId] || {}).length)
-            delete portals[laneId];
-    }
-    else
-        (portals[laneId] ??= {})[which] = JSON.parse(before);
-    undoStack.pop();
-    network = compileNetwork(roads, blocked, forced, closed, intersectionControls, portals);
-    render.invalidateGeometry();
-    portalDrag = null;
-} panStart = null; dragging = null; });
+canvas.addEventListener('pointercancel',()=>{
+ if(portalDrag){
+  const {laneId,which,before}=portalDrag;
+  if(before==='null'){
+   delete portals[laneId]?.[which];
+   if(!Object.keys(portals[laneId]||{}).length)delete portals[laneId];
+  }else (portals[laneId]??={})[which]=JSON.parse(before);
+  network=compileNetwork(roads,blocked,forced,closed,intersectionControls,portals);
+  pathLookup=new Map(network.paths.map(path=>[path.id,path]));
+  undoStack.pop();portalDrag=null;render.invalidateGeometry();
+ }
+ if(dragging&&previousRoad){
+  const road=roads.find(r=>r.id===previousRoad.id);
+  if(road)Object.assign(road,previousRoad);
+  undoStack.pop();render.invalidateGeometry();
+ }
+ previousRoad=null;panStart=null;dragging=null;
+});
 canvas.addEventListener('wheel', e => { e.preventDefault(); render.zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * .0012)); }, { passive: false });
 window.addEventListener('resize', () => render.resize());
 window.addEventListener('keydown', e => {

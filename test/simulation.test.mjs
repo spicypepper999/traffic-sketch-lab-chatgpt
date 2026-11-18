@@ -46,3 +46,32 @@ test('red signal holds a secondary-road vehicle until its green phase',async()=>
  for(let i=0;i<260;i++)tick(); // 35s: secondary road has green
  assert.ok(vehicles[0].pathId==='b:s1:f0'||stats.completed>0,'car proceeds on green');
 });
+
+test('editing a signal releases a waiting driver and preserves the paused simulation',async()=>{
+ const id='j:0:0:0';
+ const n=compileNetwork([road('a',{x:-120,y:0},{x:120,y:0}),road('b',{x:0,y:-120},{x:0,y:120})],
+  [],[],[],{[id]:{type:'signal',priorityRoad:'a',cycle:120}});
+ let tick,frame;
+ globalThis.self={postMessage(message){frame=message;}};
+ globalThis.setInterval=fn=>{tick=fn;};
+ await import('../dist/js/sim-worker.js?live-controls');
+ const send=data=>self.onmessage({data});
+ send({type:'INIT',network:n});
+ send({type:'SET_TRIP',source:'j:0:-1200:0',target:'j:0:1200:0'});
+ send({type:'SET_SPAWN_RATE',rate:0});
+ send({type:'SPAWN',count:1});
+ for(let i=0;i<440;i++)tick();
+ send({type:'SELECT_VEHICLE',id:frame.vehicles[0].id});
+ assert.ok(frame.selectedVehicle.waiting);
+ send({type:'SET_RUNNING',running:false});
+ const before=structuredClone(frame);
+ send({type:'SET_JUNCTION_CONTROL',id,control:{type:'signal',priorityRoad:'b',cycle:120}});
+ tick();tick();
+ assert.deepEqual(frame,before);
+ send({type:'SET_RUNNING',running:true});
+ for(let i=0;i<480;i++)tick();
+ assert.ok(frame.stats.simTime<60,'original signal would still be red');
+ assert.equal(frame.stats.completed,1);
+ assert.equal(frame.stats.created,1);
+ assert.equal(frame.stats.passedJunctions,1);
+});

@@ -224,30 +224,15 @@ export class Renderer {
                 }
             }
         }
-        if (o.tool === 'select' && o.selectedRoad) {
-            const r = o.roads.find(r => r.id === o.selectedRoad);
-            if (r) {
-                const shape = this.roadCache.get(r.id);
-                if (shape) {
-                    c.strokeStyle = '#ffe67a';
-                    c.lineWidth = 2.4 / this.zoom;
-                    if (shape.path)
-                        c.stroke(shape.path);
-                    else
-                        this.line(shape.pts, '#ffe67a', 2.4 / this.zoom);
-                }
-                this.line(samples(r, 45).map(s => s.p), '#8ad5c9', .9);
-                for (const [i, p] of [r.p0, r.p3, cubic(r, .5)].entries()) {
-                    c.beginPath();
-                    c.arc(p.x, p.y, 5 / this.zoom, 0, Math.PI * 2);
-                    c.fillStyle = i === 2 ? '#f0c47e' : '#c6eadd';
-                    c.fill();
-                    c.lineWidth = 1.1 / this.zoom;
-                    c.strokeStyle = '#426368';
-                    c.stroke();
-                }
-            }
-        }
+  if(o.tool==='select'&&o.selectedRoad){const r=o.roads.find(r=>r.id===o.selectedRoad);if(r){
+   for(const piece of this.roadCache.get(r.id)?.pieces||[]){
+    this.fillPath(piece.shape,piece.polygon,'#36b4bf55');
+    if(piece.lane.index===piece.lane.count-1)this.line(piece.left,'#98fff4',2/this.zoom);
+    if(piece.lane.index===0&&(!r.forward||!r.backward))this.line(piece.right,'#98fff4',2/this.zoom);
+   }
+   for(const [i,p] of [r.p0,r.p3,cubic(r,.5)].entries()){
+   c.beginPath();c.arc(p.x,p.y,5/this.zoom,0,Math.PI*2);c.fillStyle=i===2?'#f0c47e':'#c6eadd';c.fill();c.lineWidth=1.1/this.zoom;c.strokeStyle='#426368';c.stroke();
+  }}}
         if (o.route && (o.tool === 'endpoints' || o.debug))
             for (const id of o.route.ids) {
                 const p = this.pathMap.get(id);
@@ -386,7 +371,7 @@ export class Renderer {
     drawDynamic(o) {
         const c = this.ctx;
         c.setTransform(1, 0, 0, 1, 0, 0);
-        c.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.separate) c.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.setWorld();
         const x = this.camera.x, y = this.camera.y, hw = this.w / this.zoom / 2 + 5, hh = this.h / this.zoom / 2 + 5;
         for (const v of o.vehicles) {
@@ -433,7 +418,7 @@ export class Renderer {
         // as the worker rather than an approximate animation clock.
         if (o.network?.intersections) {
             const time = Number.isFinite(o.simTime) ? o.simTime + (o.paused ? 0 : o.age || 0) : 0;
-            const laneById = new Map(o.network.lanes.map(l => [l.id, l]));
+            const laneById = this.pathMap;
             for (const junction of o.network.intersections) {
                 if (junction.control?.type !== 'signal' || !this.visible(bounds(junction.polygon)))
                     continue;
@@ -512,7 +497,7 @@ export class Renderer {
         this.refreshScene(o);
         const scene = [this.camera.x, this.camera.y, this.zoom, o.grid, o.tool, o.selectedRoad, o.selectedLane, o.selectedJunction, o.selectedVehicleRoute, o.sourceId, o.targetId, o.activePairId, o.odPairs, o.debug, o.route, this.network, this.roads];
         const changed = this.dirty || !this.paintState || scene.some((v, i) => v !== this.paintState.scene[i]);
-        if (changed) {
+        if (changed || !this.separate) {
             const now = performance.now(), last = this.paintState;
             // During navigation, reuse the static bitmap with a cheap CSS transform and
             // refresh no faster than 30 Hz. Cars remain a separate 60 FPS overlay.
@@ -533,11 +518,6 @@ export class Renderer {
                 this.dirty = false;
             }
         }
-        if (this.separate)
-            this.drawDynamic(o);
-        else {
-            this.setWorld();
-            this.drawDynamic(o);
-        }
+        this.drawDynamic(o);
     }
 }

@@ -2,7 +2,7 @@
 
 A lightweight, top-down **traffic-engineering sandbox** for Windows and desktop browsers. Draw free-form roads, configure individual lanes and intersections, then generate and inspect vehicle trips.
 
-**Current version: [v0.8.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.8.0)** · [All releases](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/issues)
+**Current version: [v0.9.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.0)** · [All releases](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/issues)
 
 ## Download and play on Windows
 
@@ -10,10 +10,10 @@ A lightweight, top-down **traffic-engineering sandbox** for Windows and desktop 
 
 1. Open the [latest GitHub release](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/latest) and download **`TrafficSketchLab-Updater.exe`**.
 2. Keep it anywhere convenient (for example, your Desktop). Double-click it to start the game.
-3. On first launch only: because this repository is **private**, create a [fine-grained GitHub personal access token](https://github.com/settings/personal-access-tokens/new) with access limited to **`traffic-sketch-lab-chatgpt`**, permission **Contents: Read-only**. Paste it when prompted. Input is hidden; Windows encrypts the token using your user profile.
+3. On first launch, the updater downloads the game from the public GitHub release.
 4. Every subsequent launch checks for a new release, updates the cached game if needed, and starts it. **You do not need to download updates manually, install Node.js, or work with source code.**
 
-The launcher stores the game and its encrypted access token in `%LOCALAPPDATA%\TrafficSketchLab`. It only serves the game on your own PC (`127.0.0.1`), opening your default browser (including Firefox). If GitHub is unavailable, the installed game still works. To clear the stored token, run `TrafficSketchLab-Updater.exe --reset-auth`; to skip checking for updates, run `TrafficSketchLab-Updater.exe --offline`.
+The launcher stores the game and any previously saved encrypted access token in `%LOCALAPPDATA%\TrafficSketchLab`. It only serves the game on your own PC (`127.0.0.1`), opening your default browser (including Firefox). If GitHub is unavailable, the installed game still works. To clear the stored token, run `TrafficSketchLab-Updater.exe --reset-auth`; to skip checking for updates, run `TrafficSketchLab-Updater.exe --offline`.
 
 The updater and game executables are **unsigned development builds**. Windows SmartScreen may warn. The updater is not a native graphics engine; the game itself still runs in your browser.
 
@@ -27,6 +27,7 @@ Download `TrafficSketchLab-Windows.zip` from a [release](https://github.com/spic
 
 - Free-form Bézier streets, avenues, one-way ramps and highways; optional grid and road snapping, bridges and tunnels.
 - Lane-level routing with continuous intersection paths, edited lane portals, allowed/blocked turns, lane splits and merges.
+- Edit junction controls and undo or redo those edits while preserving vehicles, queued demand and simulation time.
 - Selectable intersections with colored movement arrows, priority controls, yield rules, stop signs and traffic signals.
 - Individual vehicle inspection (speed, delay, planned route), following distance and braking behavior.
 - Multiple independently controlled source/destination traffic pairs with statistics and a 20 Hz traffic worker.
@@ -38,6 +39,7 @@ Download `TrafficSketchLab-Windows.zip` from a [release](https://github.com/spic
 
 | Version | Summary | Release |
 | --- | --- | --- |
+| **0.9.0** | Live intersection edits, repaired selection under traffic, high-contrast road highlights and compact inspector | [v0.9.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.0) |
 | **0.8.0** | One-time Windows auto-updater, consistent localhost origin, documentation cleanup | [v0.8.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.8.0) |
 | **0.7.0** | Full-width road selection, brake lights for queues, two crossing traffic pairs, trimmed road rendering | [v0.7.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.7.0) |
 | **0.6.0** | Vehicle route inspector, road/intersection navigation and priority-road editing | [v0.6.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.6.0) |
@@ -49,6 +51,6 @@ See [CHANGELOG.md](CHANGELOG.md) for details and remaining limitations.
 
 Source contributors: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) describes project architecture, TypeScript builds, test commands, and Windows packaging. **Players do not need any of these tools.**
 
-Every push runs automated simulation/unit tests and actual Firefox UI tests on GitHub Actions. **Each new version bump in `package.json` automatically builds and publishes a new portable Windows GitHub Release**, including both the offline game ZIP and the reusable updater. Downloads are private to repository collaborators.
+Every push runs automated simulation/unit tests and actual Firefox UI tests on GitHub Actions. **Each new version bump in `package.json` automatically builds and publishes a new portable Windows GitHub Release**, including both the offline game ZIP and the reusable updater.
 
 [Build status and test reports](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/actions)

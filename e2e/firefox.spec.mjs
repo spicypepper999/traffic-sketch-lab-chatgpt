@@ -57,6 +57,7 @@ test('Firefox intersection selection opens on-map traffic controls', async ({pag
 test('Select tool picks road pavement and junctions at normal zoom',async ({page},testInfo)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto('/');await expect(page.locator('#networkBadge')).toContainText('LANES');
+ await expect.poll(async()=>Number(await page.locator('#activeStat').innerText())).toBeGreaterThan(0);
  const rect=await page.locator('#world').boundingBox();
  const loc=(x,y)=>({x:rect.x+rect.width/2+x*1.25,y:rect.y+rect.height/2+y*1.25});
  await page.locator('[data-tool="select"]').click();
@@ -69,4 +70,27 @@ test('Select tool picks road pavement and junctions at normal zoom',async ({page
  await expect(page.locator('#junctionMenu')).toBeVisible();
  await testInfo.attach('Select road and intersection', {body:await page.screenshot(),contentType:'image/png'});
  expect(errors).toEqual([]);
+});
+
+test('inspect a road after panning and zooming on a compact screen',async({page})=>{
+ await page.setViewportSize({width:800,height:720});
+ await page.goto('/');
+ await expect.poll(async()=>Number(await page.locator('#activeStat').innerText())).toBeGreaterThan(0);
+ await page.locator('#runPause').click();
+ await page.mouse.move(400,360);
+ await page.keyboard.down('Space');
+ await page.mouse.down();
+ await page.mouse.move(465,332);
+ await page.mouse.up();
+ await page.keyboard.up('Space');
+ // The same road point moves by the pan delta. Zooming around it keeps it under the cursor.
+ const x=465-180*1.25,y=332+5*1.25;
+ await page.mouse.move(x,y);
+ await page.mouse.wheel(0,-190);
+ await expect.poll(()=>page.locator('#zoomText').innerText()).not.toBe('125%');
+ await page.mouse.click(x,y);
+ await expect(page.locator('#inspectorTitle')).toHaveText('Road properties');
+ await expect(page.locator('#inspector')).toBeVisible();
+ await page.locator('#inspectorToggle').click();
+ await expect(page.locator('#inspector')).toBeHidden();
 });
