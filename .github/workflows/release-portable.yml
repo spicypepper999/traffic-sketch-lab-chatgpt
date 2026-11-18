@@ -37,6 +37,7 @@ jobs:
             Write-Host "Creating new release $tag"
             "publish=true" >> $env:GITHUB_OUTPUT
           }
+          exit 0
       - uses: actions/setup-node@v4
         if: steps.version.outputs.publish == 'true'
         with:
