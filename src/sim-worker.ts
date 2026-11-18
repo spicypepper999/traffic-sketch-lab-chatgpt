@@ -38,19 +38,41 @@ function spawn(pair){
 }
 function stopPosition(v,path){return Math.max(0,path.length-v.length/2-.75)}
 function conflicting(a,b){return a===b||conflicts.get(a)?.has(b)||conflicts.get(b)?.has(a)}
-function outgoingHasRoom(v,connector,occupied){
+function outgoingHasRoom(v, connector, occupied, following = 0){
  const exit=paths.get(connector.to);
  if(!exit||exit.closed)return false;
  // Leave a complete car length AND following gap on the exit. Critically,
  // this check happens before entering the junction, not at the exit portal.
  const arrivals=occupied.get(exit.id)||[];
  const space=v.length+gapMin+1.5;
- return !arrivals.some(other=>other.id!==v.id&&other.s<space);
+ const required = space * (1 + following);
+ if (following && exit.length < required) return false;
+ return !arrivals.some(other => other.id !== v.id && other.s < required);
+}
+function movementAvailable(v, connector, node, occupied, byId) {
+ const signal = node.control?.type === 'signal';
+ let following = 0;
+ for (const [id, movement] of reservations.get(node.id) || []) {
+  if (signal && movement === connector.id) {
+   // Drivers already on the exit lane are counted by outgoingHasRoom.
+   const leader = byId.get(id);
+   if (leader && leader.route[leader.index] !== connector.to) following++;
+  } else if (conflicting(connector.id, movement)) return false;
+ }
+ return outgoingHasRoom(v, connector, occupied, following);
+}
+function signalIsGreen(node, lane) {
+ return signalAspect(node.control, lane.roadId, time, node.signalGroups?.[lane.id]) === 'green';
+}
+function requestDistance(v, node) {
+ // On green, keep driving and commit close to the line. Recheck every tick
+ // so a changing light or a newly occupied movement can still stop the car.
+ return node.control?.type === 'signal' ? gapMin + 2 + v.v * DT : Math.max(8, v.v * 1.25 + 5);
 }
 function signalOrPriorityPermits(v,path,connector,node,occupied){
  const control=node.control||{type:'stop'},type=control.type;
  if(type==='signal'){
-  if(signalAspect(control,path.roadId,time,node.signalGroups?.[path.id])!=='green'){
+  if(!signalIsGreen(node,path)){
    v.greenWait=0;return false;
   }
   // A stopped driver reacts to the green indication rather than starting
@@ -131,7 +153,7 @@ function step(){
   const node=junctions.get(con.nodeId);if(!node?.isJunction)continue;
   const line=stopPosition(v,lane),gap=line-v.s;
   if(gap<=gapMin+1.5&&v.v<.8)v.stopped+=DT;
-  if(gap<Math.max(8,v.v*1.25+5))waiting.push({v,lane,con,node,gap});
+  if(gap < requestDistance(v,node))waiting.push({v,lane,con,node,gap});
  }
  waiting.sort((a,b)=>b.v.stopped-a.v.stopped||a.gap-b.gap||a.v.id-b.v.id);
  for(const {v,lane,con,node} of waiting){
@@ -139,8 +161,7 @@ function step(){
   const active=reservations.get(node.id);
   if(active.has(v.id))continue;
   if(!signalOrPriorityPermits(v,lane,con,node,occupied))continue;
-  if(!outgoingHasRoom(v,con,occupied))continue;
-  if([...active.values()].some(other=>conflicting(con.id,other)))continue;
+  if (!movementAvailable(v,con,node,occupied,byId)) continue;
   active.set(v.id,con.id);
  }
  const alive=[];
@@ -152,7 +173,11 @@ function step(){
   const admitted=!requiresStop||reservations.get(next.nodeId)?.has(v.id);
   const line=stopPosition(v,path);
   let lead=aheadOnRoute(v,occupied,leaders);
-  if(requiresStop&&!admitted){
+  const clearApproach = requiresStop && !admitted && node.control.type === 'signal' &&
+   line - v.s >= requestDistance(v,node) && signalIsGreen(node,path) &&
+   movementAvailable(v,next,node,occupied,byId);
+  const mustBrake = requiresStop && !admitted && !clearApproach;
+  if (mustBrake) {
    const red={v:0,gap:line-v.s};if(!lead||red.gap<lead.gap)lead=red;
   }
   const desired=Math.max(2,path.speed*(.91+(v.id%7)*.023)),a0=1.9,b0=3.2;
@@ -167,7 +192,7 @@ function step(){
   let distance=(old+v.v)*.5*DT;
   if(lead){distance=Math.min(distance,Math.max(0,lead.gap-.25));if(distance<.01&&lead.gap<gapMin)v.v=0;}
   if(requiresStop&&!admitted&&distance>=line-v.s){distance=Math.max(0,line-v.s);v.v=0;}
-  v.waiting=requiresStop&&!admitted&&line-v.s<Math.max(7,v.v*2+3);
+  v.waiting = mustBrake &&line-v.s<Math.max(7,v.v*2+3);
   // A queued car keeps its brake lamps on even after deceleration is zero.
   // Do not tie lamps solely to negative acceleration: stationary followers
   // would otherwise appear to have released their brakes.

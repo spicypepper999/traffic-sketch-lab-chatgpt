@@ -2,7 +2,7 @@
 
 A lightweight, top-down **traffic-engineering sandbox** for Windows and desktop browsers. Draw free-form roads, configure individual lanes and intersections, then generate and inspect vehicle trips.
 
-**Current version: [v0.9.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.0)** · [All releases](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/issues)
+**Current version: [v0.9.1](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.1)** · [All releases](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases) · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/issues)
 
 ## Download and play on Windows
 
@@ -39,6 +39,7 @@ Download `TrafficSketchLab-Windows.zip` from a [release](https://github.com/spic
 
 | Version | Summary | Release |
 | --- | --- | --- |
+| **0.9.1** | Clear green approaches retain speed and support following traffic | [v0.9.1](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.1) |
 | **0.9.0** | Live intersection edits, repaired selection under traffic, high-contrast road highlights and compact inspector | [v0.9.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.9.0) |
 | **0.8.0** | One-time Windows auto-updater, consistent localhost origin, documentation cleanup | [v0.8.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.8.0) |
 | **0.7.0** | Full-width road selection, brake lights for queues, two crossing traffic pairs, trimmed road rendering | [v0.7.0](https://github.com/spicypepper999/traffic-sketch-lab-chatgpt/releases/tag/v0.7.0) |

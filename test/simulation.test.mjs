@@ -5,6 +5,31 @@ import {controlStraight} from '../dist/js/geometry.js';
 const road=(id,p0,p3)=>{const[p1,p2]=controlStraight(p0,p3);return {id,kind:'street',p0,p1,p2,p3,z0:0,z1:0,...PRESETS.street}};
 const network=compileNetwork([road('east',{x:-120,y:0},{x:120,y:0}),road('south',{x:0,y:-120},{x:0,y:120})]);
 
+test('a lone driver maintains speed all the way to a clear green light',async()=>{
+ const n=compileNetwork([road('east',{x:-200,y:0},{x:200,y:0}),road('south',{x:0,y:-120},{x:0,y:120})],
+  [],[],[],{'j:0:0:0':{type:'signal',priorityRoad:'east',cycle:120}});
+ let tick,frame;
+ globalThis.self={postMessage(message){frame=message;}};
+ globalThis.setInterval=fn=>{tick=fn;};
+ await import('../dist/js/sim-worker.js?clear-green');
+ const send=data=>self.onmessage({data});
+ send({type:'INIT',network:n});
+ send({type:'SET_SPAWN_RATE',rate:0});
+ send({type:'SET_TRIP',source:'j:-2000:0:0',target:'j:2000:0:0'});
+ send({type:'SPAWN',count:1});
+ let previous=0,observations=0;
+ for(let i=0;i<550;i++){
+  tick();
+  const car=frame.vehicles[0];
+  if(car?.pathId!=='east:s0:f0'||car.s<60)continue;
+  assert.ok(car.speed>=previous-1e-8,'lost speed on an unobstructed approach');
+  assert.equal(car.braking,false);
+  previous=car.speed;observations++;
+ }
+ assert.ok(observations>50);
+ assert.equal(frame.stats.passedJunctions,1);
+});
+
 test('fixed source/target are required; routed vehicles finish only at selected destination',async()=>{
  let step,stats,vehicles;globalThis.self={postMessage(m){if(m.type==='SNAPSHOT'){stats=m.stats;vehicles=m.vehicles;}}};
  globalThis.setInterval=cb=>{step=cb;};

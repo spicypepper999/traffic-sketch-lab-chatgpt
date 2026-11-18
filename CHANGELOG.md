@@ -2,6 +2,10 @@
 
 Project releases use version tags `vMAJOR.MINOR.PATCH`. These are release versions, not save-file schema versions.
 
+## v0.9.1 — Green-light approaches
+
+- Drivers maintain speed on a clear green approach and can follow the same movement at normal spacing when the exit has capacity.
+
 ## v0.9.0 — Live traffic editing and selection
 
 - Fix Select clicks failing once vehicles enter the simulation. Highlight selected pavement across its full width.
